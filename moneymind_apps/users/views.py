@@ -1,9 +1,12 @@
 from rest_framework import viewsets, status
-from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import AllowAny
 from .models import User
 from .serializers import UserSerializer
 from django.contrib.auth import authenticate
+from rest_framework.permissions import IsAuthenticated
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -11,6 +14,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
 # Registro simple
 class RegisterView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
@@ -30,13 +34,33 @@ class RegisterView(APIView):
 
 # Login simple (solo validación de credenciales)
 class LoginView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
+
         user = authenticate(request, email=email, password=password)
         if user is not None:
-            return Response({"message": "Login exitoso", "user": UserSerializer(user).data})
-        return Response({"error": "Credenciales inválidas"}, status=status.HTTP_401_UNAUTHORIZED)
+            # Crear o recuperar token
+            token, created = Token.objects.get_or_create(user=user)
+
+            serializer = UserSerializer(user)
+            return Response({
+                "message": "Login exitoso",
+                "token": token.key,  # <- aquí va el token
+                "user": serializer.data
+            })
+        else:
+            return Response({"message": "Email o contraseña incorrectos"}, status=status.HTTP_401_UNAUTHORIZED)
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]  # solo usuarios autenticados pueden cerrar sesión
+
+    def post(self, request):
+        user = request.user
+        # eliminamos el token del usuario
+        Token.objects.filter(user=user).delete()
+        return Response({"message": "Logout exitoso"}, status=status.HTTP_200_OK)
 
 class UserListView(APIView):
     def get(self, request):
