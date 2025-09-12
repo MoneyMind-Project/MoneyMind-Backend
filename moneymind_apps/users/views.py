@@ -7,6 +7,7 @@ from .models import User
 from .serializers import UserSerializer
 from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
+from moneymind_apps.balances.models import Balance
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -15,10 +16,11 @@ class UserViewSet(viewsets.ModelViewSet):
 # Registro simple
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
-            # username = email
+            # Crear el usuario
             user = User.objects.create_user(
                 username=serializer.validated_data['email'],
                 email=serializer.validated_data['email'],
@@ -27,9 +29,18 @@ class RegisterView(APIView):
                 last_name=serializer.validated_data['last_name'],
                 birth_date=serializer.validated_data.get('birth_date'),
                 gender=serializer.validated_data.get('gender'),
-                plan=serializer.validated_data.get('plan', 'Standard')
+                plan=serializer.validated_data.get('plan', 'standard')
             )
+
+            # Crear el balance automáticamente
+            Balance.objects.create(
+                user=user,
+                current_amount=request.data.get('current_amount'),   # requerido
+                monthly_income=request.data.get('monthly_income', None)  # opcional
+            )
+
             return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Login simple (solo validación de credenciales)

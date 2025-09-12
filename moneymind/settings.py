@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'moneymind_apps.reports',
     'moneymind_apps.alerts',
     'moneymind_apps.expenses',
+    'moneymind_apps.balances',
 ]
 
 MIDDLEWARE = [

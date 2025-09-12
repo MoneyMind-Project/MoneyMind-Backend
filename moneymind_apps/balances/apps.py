@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class UsersConfig(AppConfig):
+class BalancesConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'moneymind_apps.users'
+    name = 'moneymind_apps.balances'
