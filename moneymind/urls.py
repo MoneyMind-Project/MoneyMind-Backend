@@ -21,4 +21,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     path('api/users/', include('moneymind_apps.users.urls')),
+    path('api/receipts/', include('moneymind_apps.receipts.urls')),
 ]
