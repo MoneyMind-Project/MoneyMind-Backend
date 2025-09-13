@@ -8,6 +8,7 @@ from .serializers import UserSerializer
 from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
 from moneymind_apps.balances.models import Balance
+from django.db import IntegrityError
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -20,28 +21,44 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
-            # Crear el usuario
-            user = User.objects.create_user(
-                username=serializer.validated_data['email'],
-                email=serializer.validated_data['email'],
-                password=request.data.get('password'),
-                first_name=serializer.validated_data['first_name'],
-                last_name=serializer.validated_data['last_name'],
-                birth_date=serializer.validated_data.get('birth_date'),
-                gender=serializer.validated_data.get('gender'),
-                plan=serializer.validated_data.get('plan', 'standard')
-            )
+            try:
+                # Crear el usuario
+                user = User.objects.create_user(
+                    username=serializer.validated_data['email'],
+                    email=serializer.validated_data['email'],
+                    password=request.data.get('password'),
+                    first_name=serializer.validated_data['first_name'],
+                    last_name=serializer.validated_data['last_name'],
+                    birth_date=serializer.validated_data.get('birth_date'),
+                    gender=serializer.validated_data.get('gender'),
+                    plan=serializer.validated_data.get('plan', 'standard')
+                )
 
-            # Crear el balance automáticamente
-            Balance.objects.create(
-                user=user,
-                current_amount=request.data.get('current_amount'),   # requerido
-                monthly_income=request.data.get('monthly_income', None)  # opcional
-            )
+                # Crear el balance automáticamente
+                Balance.objects.create(
+                    user=user,
+                    current_amount=request.data.get('current_amount'),   # requerido
+                    monthly_income=request.data.get('monthly_income', None)  # opcional
+                )
 
-            return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+                return Response({
+                    "message": "Registro exitoso"
+                }, status=status.HTTP_201_CREATED)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            except IntegrityError:
+                return Response({
+                    "message": "El correo ya está en uso. Por favor intenta con otro."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            except Exception as e:
+                return Response({
+                    "message": f"Ocurrió un error inesperado: {str(e)}"
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            "message": "Datos inválidos",
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 # Login simple (solo validación de credenciales)
 class LoginView(APIView):
