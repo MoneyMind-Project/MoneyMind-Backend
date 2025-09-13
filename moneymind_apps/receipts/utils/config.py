@@ -1,1 +1,3 @@
-GOOGLE_API_KEY = 'AIzaSyASbArodk3Z2M9oh_rplwnA5x9yKI3xmP8'
+from decouple import config
+
+GOOGLE_API_KEY = config("GOOGLE_API_KEY")
