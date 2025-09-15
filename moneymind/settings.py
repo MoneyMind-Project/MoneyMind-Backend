@@ -45,7 +45,6 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     "corsheaders",
     'moneymind_apps.users',
-    'moneymind_apps.receipts',
     'moneymind_apps.reports',
     'moneymind_apps.alerts',
     'moneymind_apps.expenses',

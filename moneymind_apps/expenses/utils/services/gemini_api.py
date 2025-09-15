@@ -1,5 +1,5 @@
 import google.generativeai as genai
-from moneymind_apps.receipts.utils.config import GOOGLE_API_KEY
+from moneymind_apps.expenses.utils.config import GOOGLE_API_KEY
 import json
 
 genai.configure(api_key=GOOGLE_API_KEY)
