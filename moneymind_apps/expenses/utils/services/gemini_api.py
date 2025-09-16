@@ -14,11 +14,14 @@ def analizar_recibo(image_path: str):
     prompt = """
     Analiza este recibo y devuelve SOLO un JSON con esta estructura:
     {
-      "Lugar": "...",
-      "Hora": "...",
-      "Total": "..."
+      "category": "FOOD | TRANSPORT | ENTERTAINMENT | HOUSE | HEALTH | OTHER",
+      "place": "...",
+      "date": "YYYY-MM-DD",
+      "time": "HH:mm",
+      "total": número,
+      "comment": "..."
     }
-    Si no puedes leer un campo, escribe "No detectado".
+    Si no puedes leer un campo, escribe "No detectado".  
     No escribas nada más fuera del JSON.
     """
 
