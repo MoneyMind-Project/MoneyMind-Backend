@@ -21,7 +21,7 @@ def analizar_recibo(image_path: str):
       "total": número,
       "comment": "..."
     }
-    Si no puedes leer un campo, escribe "No detectado".  
+    Si no puedes leer un campo, escribe "Null".  
     No escribas nada más fuera del JSON.
     """
 
