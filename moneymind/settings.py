@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     'moneymind_apps.users',
     'moneymind_apps.reports',
     'moneymind_apps.alerts',
-    'moneymind_apps.expenses',
+    'moneymind_apps.movements',
     'moneymind_apps.balances',
 ]
 

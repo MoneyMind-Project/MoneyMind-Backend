@@ -20,7 +20,7 @@ class Expense(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="expenses"
+        related_name="movements"
     )
     category = models.CharField(
         max_length=50,
@@ -32,12 +32,29 @@ class Expense(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2)
     comment = models.TextField(blank=True, null=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
     class Meta:
-        db_table = "expenses"
+        db_table = "movements"
         ordering = ["-date", "-time"]
 
     def __str__(self):
         return f"{self.place} - {self.total} ({self.date})"
+
+class Income(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="incomes"
+    )
+    title = models.CharField(max_length=255)
+    date = models.DateField()
+    time = models.TimeField()
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+    comment = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = "incomes"
+        ordering = ["-date", "-time"]
+
+    def __str__(self):
+        return f"{self.title} - {self.total} ({self.date})"
