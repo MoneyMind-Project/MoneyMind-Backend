@@ -3,16 +3,12 @@ import uuid
 from django.conf import settings
 from enum import Enum
 
-
 class Category(Enum):
-    ENTERTAINMENT = "entertainment"
-    FOOD = "food"
-    TRANSPORT = "transport"
-    HOUSING = "housing"
-    HEALTH = "health"
-    SHOPPING = "shopping"
-    UTILITIES = "utilities"
-    OTHER = "other"
+    GASTOS_ESENCIALES = "gastos_esenciales"
+    GASTOS_PERSONALES = "gastos_personales"
+    FINANCIEROS = "financieros"
+    EDUCACION = "educacion"
+    OTROS = "otros"
 
 
 class Expense(models.Model):

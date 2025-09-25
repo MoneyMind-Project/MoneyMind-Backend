@@ -14,15 +14,25 @@ def analyze_expense(image_path: str):
     prompt = """
     Analiza este recibo y devuelve SOLO un JSON con esta estructura:
     {
-      "category": "FOOD | TRANSPORT | ENTERTAINMENT | HOUSE | HEALTH | OTHER",
+      "category": "GASTOS_ESENCIALES | GASTOS_PERSONALES | FINANCIEROS | EDUCACION | OTROS",
       "place": "...",
       "date": "YYYY-MM-DD",
       "time": "HH:mm",
       "total": número,
       "comment": "Texto opcional con algún detalle adicional o Null"
     }
-    Si no puedes leer un campo, dejalo en Null.  
-    No escribas nada más fuera del JSON.
+
+    Guía para clasificar en "category":
+    1. GASTOS_ESENCIALES → vivienda, servicios básicos, alimentación, transporte, salud.
+    2. GASTOS_PERSONALES → entretenimiento, streaming, mascotas, cuidado personal.
+    3. FINANCIEROS → deudas y préstamos, ahorro e inversión, seguros.
+    4. EDUCACION → cursos, talleres, libros, colegiaturas.
+    5. OTROS → regalos y celebraciones, viajes y vacaciones, imprevistos.
+
+    Instrucciones:
+    - La clave "category" debe corresponder exactamente a una de las 5 categorías principales.
+    - Si no puedes leer un campo, déjalo en Null.
+    - No escribas nada más fuera del JSON.
     """
 
     try:
@@ -50,7 +60,6 @@ def analyze_expense(image_path: str):
 
         # Intentar parsear a JSON (limpiando basura alrededor)
         try:
-            # Extraer el bloque JSON aunque haya texto alrededor
             start = result.find("{")
             end = result.rfind("}")
             if start != -1 and end != -1:
@@ -76,14 +85,23 @@ def analyze_income(image_path: str):
     prompt = """
     Analiza este comprobante/recibo de INGRESO y devuelve SOLO un JSON con esta estructura:
     {
-      "title": "String con el título o fuente del ingreso (ej: 'Sueldo', 'Venta producto', etc.)",
+      "title": "Fuente principal del ingreso (ej: 'Sueldo', 'Venta de producto', 'Intereses bancarios', 'Devolución', etc.)",
       "date": "YYYY-MM-DD",
       "time": "HH:mm",
       "total": número,
       "comment": "Texto opcional con algún detalle adicional o Null"
     }
-    Si no puedes leer un campo, dejalo en Null.
-    No escribas nada más fuera del JSON.
+
+    Guía para 'title':
+    - Usa 'Sueldo' o 'Salario' si parece un pago laboral.
+    - Usa 'Venta' si corresponde a venta de producto o servicio.
+    - Usa 'Intereses' si es un ingreso bancario/financiero.
+    - Usa 'Devolución' si es un reembolso o devolución de dinero.
+    - Si no puedes identificarlo, escribe un título genérico como 'Ingreso'.
+
+    Instrucciones:
+    - Si no puedes leer un campo, déjalo en Null.
+    - Devuelve únicamente el JSON, sin texto adicional.
     """
 
     try:
