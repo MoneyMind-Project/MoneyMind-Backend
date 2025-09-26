@@ -1,5 +1,4 @@
 from django.db import models
-import uuid
 from django.conf import settings
 from enum import Enum
 
@@ -12,7 +11,7 @@ class Category(Enum):
 
 
 class Expense(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -36,7 +35,7 @@ class Expense(models.Model):
         return f"{self.place} - {self.total} ({self.date})"
 
 class Income(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
