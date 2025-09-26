@@ -6,10 +6,17 @@ from django.shortcuts import get_object_or_404
 import os
 import tempfile
 from moneymind_apps.movements.utils.services.gemini_api import analyze_expense, analyze_income
+from django.contrib.auth import get_user_model
+from django.db.models import Q
 from moneymind_apps.balances.models import Balance
 from .serializers import ExpenseSerializer, IncomeSerializer
 from decimal import Decimal
 from moneymind_apps.movements.models import Expense, Income
+from itertools import chain
+from operator import attrgetter
+
+
+User = get_user_model()  # Obtiene tu modelo User personalizado
 
 class ExpenseReceiptGeminiView(APIView):
     permission_classes = [AllowAny]
@@ -191,6 +198,129 @@ class ExpenseDeleteView(APIView):
                 "message": "Gasto eliminado exitosamente",
                 "deleted_expense_amount": str(expense_amount),
                 "new_balance": str(balance.current_amount)
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class ScanDashboardView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, user_id, *args, **kwargs):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Obtener balance actual
+        try:
+            balance = user.balance
+            current_amount = str(balance.current_amount)
+        except Balance.DoesNotExist:
+            return Response(
+                {"error": "El usuario no tiene un balance asociado"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Obtener últimos 10 incomes
+        recent_incomes = Income.objects.filter(user=user).order_by('-date', '-time')[:10]
+
+        # Obtener últimos 10 expenses
+        recent_expenses = Expense.objects.filter(user=user).order_by('-date', '-time')[:10]
+
+        # Combinar y ordenar por fecha y hora (últimos 10 en total)
+        combined_movements = list(chain(recent_incomes, recent_expenses))
+        combined_movements.sort(key=attrgetter('date', 'time'), reverse=True)
+        recent_movements = combined_movements[:10]
+
+        # Serializar movimientos
+        movements_data = []
+        for movement in recent_movements:
+            if isinstance(movement, Income):
+                serializer = IncomeSerializer(movement)
+                movement_data = serializer.data
+                movement_data['type'] = 'income'
+            else:  # Expense
+                serializer = ExpenseSerializer(movement)
+                movement_data = serializer.data
+                movement_data['type'] = 'expense'
+
+            movements_data.append(movement_data)
+
+        return Response(
+            {
+                "current_balance": current_amount,
+                "recent_movements": movements_data,
+                "total_movements": len(movements_data)
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class AllMovementsOptimizedView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, user_id, *args, **kwargs):
+        # Obtener parámetros de paginación
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 10))
+
+        if page < 1 or page_size < 1:
+            return Response(
+                {"error": "Los parámetros page y page_size deben ser >= 1"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Obtener movimientos (ordenados descendente por fecha y hora)
+        all_incomes = Income.objects.filter(user=user).order_by('-date', '-time')
+        all_expenses = Expense.objects.filter(user=user).order_by('-date', '-time')
+
+        combined_movements = list(chain(all_incomes, all_expenses))
+        combined_movements.sort(key=attrgetter('date', 'time'), reverse=True)
+
+        # Calcular offset y límite
+        offset = (page - 1) * page_size
+        movements_slice = combined_movements[offset:offset + page_size]
+
+        # Serializar
+        movements_data = []
+        for movement in movements_slice:
+            if isinstance(movement, Income):
+                serializer = IncomeSerializer(movement)
+                movement_data = serializer.data
+                movement_data['type'] = 'income'
+            else:
+                serializer = ExpenseSerializer(movement)
+                movement_data = serializer.data
+                movement_data['type'] = 'expense'
+            movements_data.append(movement_data)
+
+        # Calcular si hay más
+        total_count = len(combined_movements)
+        has_more = (offset + page_size) < total_count
+
+        return Response(
+            {
+                "movements": movements_data,
+                "has_more": has_more,
+                "page": page,
+                "page_size": page_size,
+                "total_movements": total_count,
+                "loaded_count": len(movements_data),
+                "next_page": page + 1 if has_more else None
             },
             status=status.HTTP_200_OK
         )
