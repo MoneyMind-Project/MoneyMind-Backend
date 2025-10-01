@@ -1,38 +1,62 @@
 import google.generativeai as genai
 from moneymind_apps.movements.utils.config import GOOGLE_API_KEY
 import json
+from moneymind_apps.movements.models import Category
 
 genai.configure(api_key=GOOGLE_API_KEY)
+
 
 def analyze_expense(image_path: str):
     """
     Envía una imagen a Gemini y devuelve un JSON con info del recibo.
     Si no se puede leer correctamente, retorna un mensaje de error.
     """
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash")
 
     prompt = """
     Analiza este recibo y devuelve SOLO un JSON con esta estructura:
     {
-      "category": "GASTOS_ESENCIALES | GASTOS_PERSONALES | FINANCIEROS | EDUCACION | OTROS",
+      "category": "CATEGORIA_ESPECIFICA",
       "place": "...",
       "date": "YYYY-MM-DD",
       "time": "HH:mm",
       "total": número,
-      "comment": "Texto opcional con algún detalle adicional o Null"
+      "comment": "Texto opcional con algún detalle adicional o null"
     }
 
-    Guía para clasificar en "category":
-    1. GASTOS_ESENCIALES → vivienda, servicios básicos, alimentación, transporte, salud.
-    2. GASTOS_PERSONALES → entretenimiento, streaming, mascotas, cuidado personal.
-    3. FINANCIEROS → deudas y préstamos, ahorro e inversión, seguros.
-    4. EDUCACION → cursos, talleres, libros, colegiaturas.
-    5. OTROS → regalos y celebraciones, viajes y vacaciones, imprevistos.
+    Las 16 categorías válidas son:
 
-    Instrucciones:
-    - La clave "category" debe corresponder exactamente a una de las 5 categorías principales.
-    - Si no puedes leer un campo, déjalo en Null.
+    GASTOS ESENCIALES:
+    - VIVIENDA: alquiler, hipoteca, mantenimiento, reparaciones
+    - SERVICIOS_BASICOS: agua, luz, gas, internet, teléfono
+    - ALIMENTACION: compras de supermercado, abarrotes, comida en casa
+    - TRANSPORTE: gasolina, pasajes, estacionamiento, mantenimiento del vehículo
+    - SALUD: seguros médicos, medicinas, consultas, emergencias
+
+    GASTOS PERSONALES:
+    - ENTRETENIMIENTO: cine, conciertos, bares, actividades recreativas
+    - STREAMING_SUSCRIPCIONES: Netflix, Spotify, Amazon Prime, etc.
+    - MASCOTAS: alimento, veterinario, accesorios
+    - CUIDADO_PERSONAL: peluquería, gimnasio, spa, ropa, cosméticos
+
+    FINANCIEROS:
+    - DEUDAS_PRESTAMOS: cuotas de crédito, intereses
+    - AHORRO_INVERSION: cuentas de ahorro, fondos mutuos, criptomonedas, aportes para jubilación
+    - SEGUROS: de vida, auto, vivienda, otros seguros
+
+    EDUCACION:
+    - EDUCACION_DESARROLLO: cursos, talleres, libros, capacitaciones, colegiaturas, materiales, universidad, colegio
+
+    OTROS:
+    - REGALOS_CELEBRACIONES: cumpleaños, fiestas, donaciones
+    - VIAJES_VACACIONES: boletos, hospedaje, actividades turísticas
+    - IMPREVISTOS: emergencias, reparaciones no planificadas
+
+     Instrucciones CRÍTICAS:
+    - La clave "category" debe estar en MINÚSCULAS con guiones bajos (ejemplo: deudas_prestamos, NO DEUDAS_PRESTAMOS).
+    - Si no puedes leer un campo, déjalo en null.
     - No escribas nada más fuera del JSON.
+    - Asegúrate de elegir la categoría más específica según el contenido del recibo.
     """
 
     try:
@@ -63,8 +87,19 @@ def analyze_expense(image_path: str):
             start = result.find("{")
             end = result.rfind("}")
             if start != -1 and end != -1:
-                json_text = result[start:end+1]
-                return json.loads(json_text)
+                json_text = result[start:end + 1]
+                data = json.loads(json_text)
+
+                # Validar que la categoría exista
+                try:
+                    Category(data.get("category"))
+                except ValueError:
+                    return {
+                        "error": f"Categoría inválida: {data.get('category')}. Debe ser una de las 16 categorías definidas.",
+                        "raw": result
+                    }
+
+                return data
 
             return {"error": "El modelo no devolvió un JSON válido.", "raw": result}
 
@@ -80,7 +115,7 @@ def analyze_income(image_path: str):
     Envía una imagen a Gemini y devuelve un JSON con info del ingreso.
     Si no se puede leer correctamente, retorna un mensaje de error.
     """
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash")
 
     prompt = """
     Analiza este comprobante/recibo de INGRESO y devuelve SOLO un JSON con esta estructura:
