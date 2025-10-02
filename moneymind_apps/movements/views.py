@@ -18,13 +18,17 @@ from operator import attrgetter
 
 User = get_user_model()  # Obtiene tu modelo User personalizado
 
+
 class ExpenseReceiptGeminiView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         image = request.FILES.get("file")
         if not image:
-            return Response({"error": "No se envió ninguna imagen"}, status=400)
+            return Response(
+                {"message": "No se envió ninguna imagen", "code": "NO_IMAGE"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Guardar imagen temporalmente
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
@@ -34,9 +38,23 @@ class ExpenseReceiptGeminiView(APIView):
 
         try:
             result = analyze_expense(tmp_path)
-            return Response({"data": result})
+
+            # Si hay un error de validación
+            if "error" in result:
+                return Response(
+                    {
+                        "message": result["error"],
+                        "code": result.get("code", "ANALYSIS_ERROR")
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Si el análisis fue exitoso
+            return Response({"data": result}, status=status.HTTP_200_OK)
+
         finally:
             os.remove(tmp_path)
+
 
 class IncomeReceiptGeminiView(APIView):
     permission_classes = [AllowAny]
@@ -44,7 +62,10 @@ class IncomeReceiptGeminiView(APIView):
     def post(self, request):
         image = request.FILES.get("file")
         if not image:
-            return Response({"error": "No se envió ninguna imagen"}, status=400)
+            return Response(
+                {"message": "No se envió ninguna imagen", "code": "NO_IMAGE"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Guardar imagen temporalmente
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
@@ -54,7 +75,20 @@ class IncomeReceiptGeminiView(APIView):
 
         try:
             result = analyze_income(tmp_path)
-            return Response({"data": result})
+
+            # Si hay un error de validación
+            if "error" in result:
+                return Response(
+                    {
+                        "message": result["error"],
+                        "code": result.get("code", "ANALYSIS_ERROR")
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Si el análisis fue exitoso
+            return Response({"data": result}, status=status.HTTP_200_OK)
+
         finally:
             os.remove(tmp_path)
 
