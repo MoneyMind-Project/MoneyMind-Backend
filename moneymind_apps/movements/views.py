@@ -60,33 +60,47 @@ class IncomeReceiptGeminiView(APIView):
 
 class ExpenseCreateView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []  # ← AGREGAR ESTA LÍNEA para deshabilitar autenticación
+    authentication_classes = []
 
     def post(self, request, *args, **kwargs):
-
         serializer = ExpenseSerializer(data=request.data)
 
         if serializer.is_valid():
-            expense = serializer.save()
+            # 👇 Aquí usamos el user_id directamente
+            user_id = serializer.validated_data["user_id"]
+            category = serializer.validated_data["category"]
+            place = serializer.validated_data["place"]
+            date = serializer.validated_data["date"]
+            time = serializer.validated_data["time"]
+            total = serializer.validated_data["total"]
 
-            user = expense.user
+            # 🔎 Verificar duplicado
+            exists = Expense.objects.filter(
+                user_id=user_id,
+                category=category,
+                place=place,
+                date=date,
+                time=time,
+                total=total
+            ).exists()
 
-            try:
-                balance = user.balance
-            except Balance.DoesNotExist:
+            if exists:
                 return Response(
-                    {"error": "El usuario no tiene un balance asociado"},
+                    {"message": "DUPLICATED"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            balance.current_amount = balance.current_amount - Decimal(expense.total)
+            # 👇 Usamos serializer.save() que internamente resuelve el user_id → user
+            expense = serializer.save()
+            balance = expense.user.balance
+            balance.current_amount -= Decimal(expense.total)
             balance.save()
 
             return Response(
                 {
                     "message": "Gasto registrado exitosamente",
                     "expense": ExpenseSerializer(expense).data,
-                    "new_balance": str(balance.current_amount)
+                    "new_balance": str(balance.current_amount),
                 },
                 status=status.HTTP_201_CREATED
             )
@@ -98,32 +112,42 @@ class IncomeCreateView(APIView):
     authentication_classes = []
 
     def post(self, request, *args, **kwargs):
-
         serializer = IncomeSerializer(data=request.data)
 
         if serializer.is_valid():
-            income = serializer.save()
+            user_id = serializer.validated_data["user_id"]
+            title = serializer.validated_data["title"]
+            date = serializer.validated_data["date"]
+            time = serializer.validated_data["time"]
+            total = serializer.validated_data["total"]
 
-            # Obtener el usuario del income recién creado
-            user = income.user
+            # 🔎 Verificar duplicado
+            exists = Income.objects.filter(
+                user_id=user_id,
+                title=title,
+                date=date,
+                time=time,
+                total=total
+            ).exists()
 
-            try:
-                balance = user.balance
-            except Balance.DoesNotExist:
+            if exists:
                 return Response(
-                    {"error": "El usuario no tiene un balance asociado"},
+                    {"message": "DUPLICATED"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # SUMA el ingreso al current_amount (diferente a expense que resta)
-            balance.current_amount = balance.current_amount + Decimal(income.total)
+            # Crear el income normalmente (serializer se encarga de mapear user_id → user)
+            income = serializer.save()
+
+            balance = income.user.balance  # ✅ Aquí ya tenemos el user correcto
+            balance.current_amount += Decimal(income.total)
             balance.save()
 
             return Response(
                 {
                     "message": "Ingreso registrado exitosamente",
                     "income": IncomeSerializer(income).data,
-                    "new_balance": str(balance.current_amount)
+                    "new_balance": str(balance.current_amount),
                 },
                 status=status.HTTP_201_CREATED
             )
