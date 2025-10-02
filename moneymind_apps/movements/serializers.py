@@ -19,8 +19,9 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "time",
             "total",
             "comment",
+            "created_at",
         ]
-        read_only_fields = ["id", "user"]
+        read_only_fields = ["id", "user", "created_at"]
 
     def create(self, validated_data):
         user_id = validated_data.pop("user_id")
@@ -43,8 +44,9 @@ class IncomeSerializer(serializers.ModelSerializer):
             "time",
             "total",
             "comment",
+            "created_at",
         ]
-        read_only_fields = ["id", "user"]
+        read_only_fields = ["id", "user", "created_at"]
 
     def create(self, validated_data):
         user_id = validated_data.pop("user_id")
