@@ -2,6 +2,9 @@ from django.db import models
 from django.conf import settings
 from enum import Enum
 
+class ExpenseType(Enum):
+    ESENCIAL = "esencial"
+    NO_ESENCIAL = "no_esencial"
 
 class CategoryParent(Enum):
     GASTOS_ESENCIALES = "gastos_esenciales"
@@ -62,6 +65,34 @@ CATEGORY_PARENT_MAP = {
     Category.VIAJES_VACACIONES: CategoryParent.OTROS,
     Category.IMPREVISTOS: CategoryParent.OTROS,
 }
+
+# Mapeo de categorías a tipo de gasto (esencial vs no esencial)
+CATEGORY_EXPENSE_TYPE_MAP = {
+    # ESENCIALES
+    Category.VIVIENDA: ExpenseType.ESENCIAL,
+    Category.SERVICIOS_BASICOS: ExpenseType.ESENCIAL,
+    Category.ALIMENTACION: ExpenseType.ESENCIAL,
+    Category.TRANSPORTE: ExpenseType.ESENCIAL,
+    Category.SALUD: ExpenseType.ESENCIAL,
+    Category.SEGUROS: ExpenseType.ESENCIAL,
+    Category.EDUCACION_DESARROLLO: ExpenseType.ESENCIAL,
+
+    # NO ESENCIALES
+    Category.ENTRETENIMIENTO: ExpenseType.NO_ESENCIAL,
+    Category.STREAMING_SUSCRIPCIONES: ExpenseType.NO_ESENCIAL,
+    Category.MASCOTAS: ExpenseType.NO_ESENCIAL,
+    Category.CUIDADO_PERSONAL: ExpenseType.NO_ESENCIAL,
+    Category.DEUDAS_PRESTAMOS: ExpenseType.NO_ESENCIAL,
+    Category.AHORRO_INVERSION: ExpenseType.NO_ESENCIAL,
+    Category.REGALOS_CELEBRACIONES: ExpenseType.NO_ESENCIAL,
+    Category.VIAJES_VACACIONES: ExpenseType.NO_ESENCIAL,
+    Category.IMPREVISTOS: ExpenseType.NO_ESENCIAL,
+}
+
+
+def get_expense_type(category: Category) -> ExpenseType:
+    """Obtiene el tipo de gasto (esencial o no esencial) de una categoría"""
+    return CATEGORY_EXPENSE_TYPE_MAP.get(category)
 
 
 def get_parent_category(category: Category) -> CategoryParent:
