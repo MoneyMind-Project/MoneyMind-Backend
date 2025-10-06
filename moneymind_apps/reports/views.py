@@ -3,8 +3,152 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework import status
 from django.db.models import Sum
+from datetime import datetime
 from decimal import Decimal
 from moneymind_apps.movements.models import *
+from moneymind_apps.balances.models import *
+from moneymind_apps.alerts.models import Alert, AlertType
+
+
+class DashboardOverviewView(APIView):
+    permission_classes = [AllowAny]
+    """
+    Retorna los KPIs principales del dashboard
+    """
+
+    def get(self, request):
+        user_id = request.query_params.get('user_id')
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
+
+        if not user_id:
+            return Response(
+                {"error": "user_id es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if not month:
+                month = datetime.now().month
+            else:
+                month = int(month)
+
+            if not year:
+                year = datetime.now().year
+            else:
+                year = int(year)
+
+        except ValueError as e:
+            return Response(
+                {"error": f"Parámetros inválidos: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1. Total gastado este mes
+        total_gastado = Expense.objects.filter(
+            user_id=user_id,
+            date__month=month,
+            date__year=year
+        ).aggregate(total=Sum('total'))['total'] or Decimal('0')
+
+        # 2. Categoría más alta
+        categoria_alta = Expense.objects.filter(
+            user_id=user_id,
+            date__month=month,
+            date__year=year
+        ).values('category').annotate(
+            total=Sum('total')
+        ).order_by('-total').first()
+
+        categoria_mas_alta = None
+        if categoria_alta:
+            from moneymind_apps.movements.models import CATEGORY_LABELS
+            try:
+                cat_enum = Category(categoria_alta['category'])
+                categoria_mas_alta = {
+                    "category": categoria_alta['category'],
+                    "label": CATEGORY_LABELS.get(cat_enum, categoria_alta['category']),
+                    "total": float(categoria_alta['total'])
+                }
+            except ValueError:
+                categoria_mas_alta = None
+
+        # 3. Presupuesto restante
+        try:
+            balance = Balance.objects.get(user_id=user_id)
+            presupuesto_restante = float(balance.current_amount)
+        except Balance.DoesNotExist:
+            presupuesto_restante = 0
+
+        # 4. Proyección del próximo mes (promedio de últimos 3 meses)
+        last_3_months_totals = []
+        for i in range(1, 4):
+            target_month = month - i
+            target_year = year
+
+            if target_month <= 0:
+                target_month += 12
+                target_year -= 1
+
+            month_total = Expense.objects.filter(
+                user_id=user_id,
+                date__month=target_month,
+                date__year=target_year
+            ).aggregate(total=Sum('total'))['total'] or Decimal('0')
+
+            last_3_months_totals.append(float(month_total))
+
+        if last_3_months_totals:
+            proyeccion = sum(last_3_months_totals) / len(last_3_months_totals)
+        else:
+            proyeccion = float(total_gastado)
+
+        # Verificar y crear alerta si es necesario
+        self.check_budget_alert(user_id, month, year, float(total_gastado), presupuesto_restante)
+
+        return Response(
+            {
+                "success": True,
+                "data": {
+                    "total_gastado_mes": float(total_gastado),
+                    "categoria_mas_alta": categoria_mas_alta,
+                    "presupuesto_restante": presupuesto_restante,
+                    "proyeccion_proximo_mes": round(proyeccion, 2)
+                },
+                "month": month,
+                "year": year
+            },
+            status=status.HTTP_200_OK
+        )
+
+    def check_budget_alert(self, user_id, month, year, total_gastado, presupuesto_total):
+        """
+        Verifica si se debe crear una alerta de presupuesto
+        """
+        # Calcular si se gastó más de 2/3 del presupuesto
+        if presupuesto_total > 0:
+            umbral = presupuesto_total * (2 / 3)
+
+            if total_gastado >= umbral:
+                # Verificar si ya existe una alerta para este mes
+                alert_exists = Alert.objects.filter(
+                    user_id=user_id,
+                    alert_type=AlertType.RISK.value,
+                    target_month=month,
+                    target_year=year
+                ).exists()
+
+                if not alert_exists:
+                    # Crear la alerta
+                    porcentaje = (total_gastado / presupuesto_total) * 100
+                    Alert.objects.create(
+                        user_id=user_id,
+                        alert_type=AlertType.RISK.value,
+                        message=f"Has gastado el {porcentaje:.1f}% de tu presupuesto este mes. Te quedan S/ {presupuesto_total - total_gastado:.2f}",
+                        target_month=month,
+                        target_year=year,
+                        seen=False
+                    )
 
 
 class ExpensesByCategoryView(APIView):

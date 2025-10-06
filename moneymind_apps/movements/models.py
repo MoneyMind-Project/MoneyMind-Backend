@@ -89,6 +89,30 @@ CATEGORY_EXPENSE_TYPE_MAP = {
     Category.IMPREVISTOS: ExpenseType.NO_ESENCIAL,
 }
 
+# Descripciones amigables para cada categoría
+CATEGORY_LABELS = {
+    Category.VIVIENDA: "Vivienda",
+    Category.SERVICIOS_BASICOS: "Servicios Básicos",
+    Category.ALIMENTACION: "Alimentación",
+    Category.TRANSPORTE: "Transporte",
+    Category.SALUD: "Salud",
+
+    Category.ENTRETENIMIENTO: "Entretenimiento",
+    Category.STREAMING_SUSCRIPCIONES: "Streaming y Suscripciones",
+    Category.MASCOTAS: "Mascotas",
+    Category.CUIDADO_PERSONAL: "Cuidado Personal",
+
+    Category.DEUDAS_PRESTAMOS: "Deudas y Préstamos",
+    Category.AHORRO_INVERSION: "Ahorro e Inversión",
+    Category.SEGUROS: "Seguros",
+
+    Category.EDUCACION_DESARROLLO: "Educación y Desarrollo",
+
+    Category.REGALOS_CELEBRACIONES: "Regalos y Celebraciones",
+    Category.VIAJES_VACACIONES: "Viajes y Vacaciones",
+    Category.IMPREVISTOS: "Imprevistos",
+}
+
 
 def get_expense_type(category: Category) -> ExpenseType:
     """Obtiene el tipo de gasto (esencial o no esencial) de una categoría"""
