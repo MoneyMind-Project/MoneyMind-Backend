@@ -151,6 +151,104 @@ class DashboardOverviewView(APIView):
                     )
 
 
+class MonthlyExpensesPredictionView(APIView):
+    permission_classes = [AllowAny]
+    """
+    Obtiene gastos mensuales reales y predicciones para el resto del año
+    """
+
+    def get(self, request):
+        user_id = request.query_params.get('user_id')
+        year = request.query_params.get('year', None)
+
+        if not user_id:
+            return Response(
+                {"error": "user_id es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if not year:
+                from datetime import datetime
+                year = datetime.now().year
+            else:
+                year = int(year)
+
+        except ValueError as e:
+            return Response(
+                {"error": f"Parámetros inválidos: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from datetime import datetime
+        current_date = datetime.now()
+        current_month = current_date.month if current_date.year == year else 12
+
+        # Obtener gastos reales de cada mes
+        monthly_expenses = []
+        for month in range(1, 13):
+            month_total = Expense.objects.filter(
+                user_id=user_id,
+                date__month=month,
+                date__year=year
+            ).aggregate(total=Sum('total'))['total']
+
+            monthly_expenses.append({
+                "month": month,
+                "real": float(month_total) if month_total else None
+            })
+
+        # Calcular predicción para meses futuros
+        months_with_data = [m for m in monthly_expenses if m["real"] is not None and m["real"] > 0]
+
+        if len(months_with_data) >= 3:
+            last_3_months = months_with_data[-3:]
+            avg_expense = sum(m["real"] for m in last_3_months) / 3
+        elif len(months_with_data) > 0:
+            avg_expense = sum(m["real"] for m in months_with_data) / len(months_with_data)
+        else:
+            avg_expense = 0
+
+        # Obtener el valor real del mes actual para usar como punto de partida
+        current_month_value = monthly_expenses[current_month - 1]["real"] if current_month <= 12 else None
+
+        predictions = []
+        for i, month_data in enumerate(monthly_expenses):
+            month = month_data["month"]
+
+            if month < current_month:
+                # Meses pasados - no hay predicción
+                predictions.append(None)
+            elif month == current_month:
+                # Mes actual - usar valor real para conectar las líneas
+                predictions.append(current_month_value)
+            else:
+                # Meses futuros - calcular predicción
+                months_ahead = month - current_month
+                # Usar el valor del mes actual como base
+                base_value = current_month_value if current_month_value else avg_expense
+                predicted_value = base_value * (1.02 ** months_ahead)
+                predictions.append(round(predicted_value, 2))
+
+        # Formatear respuesta
+        result = []
+        for i, month_data in enumerate(monthly_expenses):
+            result.append({
+                "month": month_data["month"],
+                "real": month_data["real"],
+                "prediction": predictions[i]
+            })
+
+        return Response(
+            {
+                "success": True,
+                "data": result,
+                "year": year,
+                "current_month": current_month
+            },
+            status=status.HTTP_200_OK
+        )
+
 class ExpensesByCategoryView(APIView):
     permission_classes = [AllowAny]
     """
