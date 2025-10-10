@@ -15,6 +15,7 @@ from moneymind_apps.movements.models import Expense, Income
 from itertools import chain
 from operator import attrgetter
 
+from moneymind_apps.balances.views import check_and_register_monthly_balance
 
 User = get_user_model()  # Obtiene tu modelo User personalizado
 
@@ -266,6 +267,9 @@ class ScanDashboardView(APIView):
     authentication_classes = []
 
     def get(self, request, user_id, *args, **kwargs):
+
+        check_and_register_monthly_balance(user_id)
+
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
@@ -382,3 +386,4 @@ class AllMovementsOptimizedView(APIView):
             },
             status=status.HTTP_200_OK
         )
+

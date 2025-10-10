@@ -401,6 +401,71 @@ class ExpensesByParentCategoryView(APIView):
             status=status.HTTP_200_OK
         )
 
+class SavingsEvolutionView(APIView):
+    permission_classes = [AllowAny]
+    """
+    Obtiene la evolución del ahorro mes a mes
+    """
+
+    def get(self, request):
+        user_id = request.query_params.get('user_id')
+        year = request.query_params.get('year', None)
+
+        if not user_id:
+            return Response(
+                {"error": "user_id es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if not year:
+                from datetime import datetime
+                year = datetime.now().year
+            else:
+                year = int(year)
+
+        except ValueError as e:
+            return Response(
+                {"error": f"Parámetros inválidos: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from moneymind_apps.balances.models import UserBalanceHistory
+
+        # Obtener el historial de balances del año
+        history = UserBalanceHistory.objects.filter(
+            user_id=user_id,
+            date__year=year
+        ).order_by('date')
+
+        # Formatear respuesta
+        monthly_savings = []
+        previous_amount = None
+
+        for record in history:
+            # Calcular el ahorro (diferencia con el mes anterior)
+            if previous_amount is not None:
+                saving = float(record.amount) - previous_amount
+            else:
+                saving = 0  # Primer mes no tiene comparación
+
+            monthly_savings.append({
+                "month": record.date.month,
+                "date": record.date.isoformat(),
+                "balance": float(record.amount),
+                "saving": saving
+            })
+
+            previous_amount = float(record.amount)
+
+        return Response(
+            {
+                "success": True,
+                "data": monthly_savings,
+                "year": year
+            },
+            status=status.HTTP_200_OK
+        )
 
 class EssentialVsNonEssentialExpensesView(APIView):
     permission_classes = [AllowAny]

@@ -26,3 +26,22 @@ class Balance(models.Model):
 
     def __str__(self):
         return f"Balance de {self.user.email}: {self.current_amount}"
+
+
+class UserBalanceHistory(models.Model):
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="balance_history"
+    )
+    date = models.DateField()
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        db_table = "user_balance_history"
+        unique_together = ['user', 'date']
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.date} - S/ {self.amount}"

@@ -6,5 +6,6 @@ urlpatterns = [
     path('expenses-by-parent-category/', ExpensesByParentCategoryView.as_view(), name='expenses-by-parent-category'),
     path('essential-vs-non-essential/', EssentialVsNonEssentialExpensesView.as_view(), name='essential-vs-non-essential'),
     path('monthly-prediction/', MonthlyExpensesPredictionView.as_view(), name='monthly-prediction'),
+    path('saving-evolution/', SavingsEvolutionView.as_view(), name='saving-evolution'),
     path('dashboard-overview/', DashboardOverviewView.as_view(), name='dashboard-overview'),
 ]
