@@ -73,12 +73,16 @@ class DashboardOverviewView(APIView):
             except ValueError:
                 categoria_mas_alta = None
 
-        # 3. Presupuesto restante
+        # 3. Presupuesto restante (balance actual)
         try:
             balance = Balance.objects.get(user_id=user_id)
             presupuesto_restante = float(balance.current_amount)
         except Balance.DoesNotExist:
             presupuesto_restante = 0
+
+        # 👈 NUEVO: Calcular presupuesto inicial del mes
+        # Presupuesto inicial = balance actual + total gastado este mes
+        presupuesto_inicial_mes = presupuesto_restante + float(total_gastado)
 
         # 4. Proyección del próximo mes (promedio de últimos 3 meses)
         last_3_months_totals = []
@@ -104,7 +108,8 @@ class DashboardOverviewView(APIView):
             proyeccion = float(total_gastado)
 
         # Verificar y crear alerta si es necesario
-        self.check_budget_alert(user_id, month, year, float(total_gastado), presupuesto_restante)
+        # 👈 CAMBIO: Pasar presupuesto_inicial_mes en lugar de presupuesto_restante
+        self.check_budget_alert(user_id, month, year, float(total_gastado), presupuesto_inicial_mes)
 
         return Response(
             {
@@ -121,13 +126,13 @@ class DashboardOverviewView(APIView):
             status=status.HTTP_200_OK
         )
 
-    def check_budget_alert(self, user_id, month, year, total_gastado, presupuesto_total):
+    def check_budget_alert(self, user_id, month, year, total_gastado, presupuesto_inicial_mes):
         """
         Verifica si se debe crear una alerta de presupuesto
         """
-        # Calcular si se gastó más de 2/3 del presupuesto
-        if presupuesto_total > 0:
-            umbral = presupuesto_total * (2 / 3)
+        # Calcular si se gastó más de 2/3 del presupuesto inicial del mes
+        if presupuesto_inicial_mes > 0:
+            umbral = presupuesto_inicial_mes * (2 / 3)
 
             if total_gastado >= umbral:
                 # Verificar si ya existe una alerta para este mes
@@ -139,12 +144,14 @@ class DashboardOverviewView(APIView):
                 ).exists()
 
                 if not alert_exists:
-                    # Crear la alerta
-                    porcentaje = (total_gastado / presupuesto_total) * 100
+                    # Calcular cuánto queda del presupuesto inicial
+                    restante = presupuesto_inicial_mes - total_gastado
+                    porcentaje = (total_gastado / presupuesto_inicial_mes) * 100
+
                     Alert.objects.create(
                         user_id=user_id,
                         alert_type=AlertType.RISK.value,
-                        message=f"Has gastado el {porcentaje:.1f}% de tu presupuesto este mes. Te quedan S/ {presupuesto_total - total_gastado:.2f}",
+                        message=f"Has gastado el {porcentaje:.1f}% de tu presupuesto inicial este mes (S/ {presupuesto_inicial_mes:.2f}). Te quedan S/ {restante:.2f}",
                         target_month=month,
                         target_year=year,
                         seen=False
