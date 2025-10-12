@@ -2,9 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework import status
-from django.db.models import Sum
-from django.http import HttpResponse
 from moneymind_apps.alerts.models import *
+from django.shortcuts import get_object_or_404
 
 class UserAlertsView(APIView):
     permission_classes = [AllowAny]
@@ -175,3 +174,76 @@ class UserAlertsPaginationView(APIView):
             {"success": True, "message": "Alertas marcadas como vistas"},
             status=status.HTTP_200_OK
         )
+
+class MarkAlertAsSeenView(APIView):
+    permission_classes = [AllowAny]
+    """
+    Marca una alerta específica como vista (seen=True) para un usuario en específico.
+    """
+
+    def patch(self, request, user_id, alert_id):
+
+        try:
+            alert = get_object_or_404(Alert, id=alert_id, user_id=user_id)
+
+            if not alert.seen:
+                alert.seen = True
+                alert.save(update_fields=['seen'])
+                print("🟢 Alerta marcada como vista.")
+
+            return Response(
+                {
+                    "success": True,
+                    "message": f"Alerta {alert_id} marcada como vista para usuario {user_id}."
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Error al marcar la alerta como vista: {str(e)}"
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class MarkAllRiskAlertsAsSeenView(APIView):
+    permission_classes = [AllowAny]
+    """
+    Marca todas las alertas de tipo 'risk' de un usuario específico como vistas.
+    El 'user_id' se recibe desde la URL.
+    """
+
+    def patch(self, request, user_id):
+        """
+        Actualiza todas las alertas de tipo 'risk' (seen=False → seen=True)
+        pertenecientes al usuario indicado en la URL.
+        """
+        try:
+            updated_count = Alert.objects.filter(
+                user_id=user_id,
+                alert_type='risk',
+                seen=False
+            ).update(seen=True)
+
+            return Response(
+                {
+                    "success": True,
+                    "updated_count": updated_count,
+                    "message": f"{updated_count} alertas de tipo 'risk' marcadas como vistas para el usuario {user_id}."
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Error al marcar alertas 'risk' como vistas: {str(e)}"
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
