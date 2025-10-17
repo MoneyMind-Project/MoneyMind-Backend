@@ -8,4 +8,5 @@ urlpatterns = [
     path('monthly-prediction/', MonthlyExpensesPredictionView.as_view(), name='monthly-prediction'),
     path('saving-evolution/', SavingsEvolutionView.as_view(), name='saving-evolution'),
     path('dashboard-overview/', DashboardOverviewView.as_view(), name='dashboard-overview'),
+    path('home/dashboard/', HomeDashboardView.as_view(), name='home-dashboard'),
 ]

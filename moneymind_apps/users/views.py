@@ -8,6 +8,7 @@ from .serializers import UserSerializer
 from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
 from moneymind_apps.balances.models import Balance
+from moneymind_apps.balances.views import *
 from django.db import IntegrityError
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -95,3 +96,55 @@ class UserListView(APIView):
         users = User.objects.all()
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
+
+class UpdateUserProfileView(APIView):
+    permission_classes = [AllowAny]
+
+    def patch(self, request):
+        user_id = request.data.get("user_id")
+        first_name = request.data.get("first_name")
+        last_name = request.data.get("last_name")
+        gender = request.data.get("gender")
+        birth_date = request.data.get("birth_date")
+        monthly_income = request.data.get("monthly_income")
+
+        # Validar user_id
+        if not user_id:
+            return Response({"error": "user_id es requerido"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Buscar usuario
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "Usuario no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Actualizar campos del usuario si vienen en el request
+        if first_name is not None:
+            user.first_name = first_name
+        if last_name is not None:
+            user.last_name = last_name
+        if gender is not None:
+            user.gender = gender
+        if birth_date is not None:
+            user.birth_date = birth_date
+
+        user.save()
+
+        # Actualizar el monthly_income si viene en el request
+        if monthly_income is not None:
+            try:
+                update_monthly_income(user.id, monthly_income)
+            except ValueError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            "message": "Perfil actualizado correctamente",
+            "user": {
+                "id": user.id,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "gender": user.gender,
+                "birth_date": user.birth_date,
+            },
+            "monthly_income": monthly_income
+        }, status=status.HTTP_200_OK)

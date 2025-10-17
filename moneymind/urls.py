@@ -24,4 +24,5 @@ urlpatterns = [
     path('api/movements/', include('moneymind_apps.movements.urls')),
     path('api/reports/', include('moneymind_apps.reports.urls')),
     path('api/alerts/', include('moneymind_apps.alerts.urls')),
+    path('api/balances/', include('moneymind_apps.balances.urls')),
 ]

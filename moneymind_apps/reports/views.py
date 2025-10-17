@@ -8,6 +8,9 @@ from decimal import Decimal
 from moneymind_apps.movements.models import *
 from moneymind_apps.balances.models import *
 from moneymind_apps.alerts.models import Alert, AlertType
+from moneymind_apps.users.models import User
+from django.utils import timezone
+from datetime import datetime
 
 
 class DashboardOverviewView(APIView):
@@ -157,6 +160,133 @@ class DashboardOverviewView(APIView):
                         seen=False
                     )
 
+
+class HomeDashboardView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        user_id = request.query_params.get('user_id')
+
+        if not user_id:
+            return Response(
+                {"error": "user_id es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Obtener mes y año actuales
+        now = timezone.now()
+        current_month = now.month
+        current_year = now.year
+
+        # 2. Obtener tip semanal (temporal - datos inventados)
+        weekly_tip = self._get_weekly_tip()
+
+        # 3. Obtener datos de presupuesto
+        budget_data = self._get_budget_data(user_id, current_month, current_year)
+
+        # 4. Obtener gastos diarios del mes
+        daily_expenses = self._get_daily_expenses(user_id, current_month, current_year)
+
+        # 5. Obtener próximos pagos (temporal - array vacío)
+        upcoming_payments = self._get_upcoming_payments()
+
+        return Response(
+            {
+                "success": True,
+                "data": {
+                    "weekly_tip": weekly_tip,
+                    "budget": budget_data,
+                    "daily_expenses": daily_expenses,
+                    "upcoming_payments": upcoming_payments
+                }
+            },
+            status=status.HTTP_200_OK
+        )
+
+    def _get_weekly_tip(self):
+        """
+        Tip semanal temporal (datos inventados)
+        TODO: Implementar con IA basado en comportamiento del usuario
+        """
+        return {
+            "title": "Consejo de ahorro",
+            "message": "Has gastado 45% más en 'Entretenimiento' este mes. Considera reducir salidas y usar alternativas gratuitas como parques.",
+        }
+
+    def _get_budget_data(self, user_id, month, year):
+        """Calcular presupuesto del mes actual"""
+
+        # Total gastado este mes
+        total_gastado = Expense.objects.filter(
+            user_id=user_id,
+            date__month=month,
+            date__year=year
+        ).aggregate(total=Sum('total'))['total'] or Decimal('0')
+
+        # Presupuesto restante (balance actual)
+        try:
+            balance = Balance.objects.get(user_id=user_id)
+            presupuesto_restante = float(balance.current_amount)
+        except Balance.DoesNotExist:
+            presupuesto_restante = 0
+
+        # Total del presupuesto
+        total_presupuesto = float(total_gastado) + presupuesto_restante
+
+        # Calcular porcentaje gastado
+        if total_presupuesto > 0:
+            porcentaje_gastado = round((float(total_gastado) / total_presupuesto) * 100, 1)
+        else:
+            porcentaje_gastado = 0
+
+        return {
+            "month": month,  # Número del mes (1-12)
+            "year": year,
+            "total": round(total_presupuesto, 2),
+            "spent": round(float(total_gastado), 2),
+            "remaining": round(presupuesto_restante, 2),
+            "percentage": porcentaje_gastado
+        }
+
+    def _get_daily_expenses(self, user_id, month, year):
+        """
+        Obtener gastos agrupados por día del mes actual
+        Retorna array con {day, amount} para cada día que tuvo gastos
+        """
+
+        # Obtener todos los gastos del mes
+        expenses = Expense.objects.filter(
+            user_id=user_id,
+            date__month=month,
+            date__year=year
+        ).values('date').annotate(
+            total_amount=Sum('total')
+        ).order_by('date')
+
+        # Formatear datos para el gráfico
+        daily_data = []
+        for expense in expenses:
+            daily_data.append({
+                "day": expense['date'].day,
+                "amount": round(float(expense['total_amount']), 2)
+            })
+
+        return daily_data
+
+    def _get_upcoming_payments(self):
+        """
+        Próximos pagos/deudas (temporal - array vacío)
+        TODO: Implementar modelo de Payments/Debts
+        """
+        return []
 
 class MonthlyExpensesPredictionView(APIView):
     permission_classes = [AllowAny]
