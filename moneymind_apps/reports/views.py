@@ -2,15 +2,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework import status
-from django.db.models import Sum
-from datetime import datetime
-from decimal import Decimal
-from moneymind_apps.movements.models import *
 from moneymind_apps.balances.models import *
 from moneymind_apps.alerts.models import Alert, AlertType
 from moneymind_apps.users.models import User
 from django.utils import timezone
-from datetime import datetime
+from moneymind_apps.reports.models import *
+from moneymind_apps.movements.utils.services.gemini_api import *
 
 
 class DashboardOverviewView(APIView):
@@ -160,7 +157,6 @@ class DashboardOverviewView(APIView):
                         seen=False
                     )
 
-
 class HomeDashboardView(APIView):
     permission_classes = [AllowAny]
 
@@ -187,7 +183,7 @@ class HomeDashboardView(APIView):
         current_year = now.year
 
         # 2. Obtener tip semanal (temporal - datos inventados)
-        weekly_tip = self._get_weekly_tip()
+        weekly_tip = self._get_weekly_tip(int(user_id))
 
         # 3. Obtener datos de presupuesto
         budget_data = self._get_budget_data(user_id, current_month, current_year)
@@ -211,15 +207,21 @@ class HomeDashboardView(APIView):
             status=status.HTTP_200_OK
         )
 
-    def _get_weekly_tip(self):
-        """
-        Tip semanal temporal (datos inventados)
-        TODO: Implementar con IA basado en comportamiento del usuario
-        """
-        return {
-            "title": "Consejo de ahorro",
-            "message": "Has gastado 45% más en 'Entretenimiento' este mes. Considera reducir salidas y usar alternativas gratuitas como parques.",
-        }
+    def _get_weekly_tip(self, user_id: int):
+        """Obtiene el tip semanal personalizado basado en IA"""
+        try:
+            tip_message = get_or_generate_weekly_tip(user_id)
+            return {
+                "title": "Consejo de la semana",
+                "message": tip_message
+            }
+        except Exception as e:
+            # Fallback en caso de error
+            print(f"Error obteniendo weekly tip: {str(e)}")
+            return {
+                "title": "Consejo de ahorro",
+                "message": "Revisa tus gastos semanalmente para mantener el control de tu presupuesto."
+            }
 
     def _get_budget_data(self, user_id, month, year):
         """Calcular presupuesto del mes actual"""
@@ -459,7 +461,6 @@ class ExpensesByCategoryView(APIView):
             status=status.HTTP_200_OK
         )
 
-
 class ExpensesByParentCategoryView(APIView):
     permission_classes = [AllowAny]
     """
@@ -677,3 +678,27 @@ class EssentialVsNonEssentialExpensesView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+def get_or_generate_weekly_tip(user_id: int) -> str:
+    """
+    Obtiene el tip semanal del usuario o genera uno nuevo si no existe o está vencido
+    """
+    try:
+        tip_obj = WeeklyTip.objects.get(user_id=user_id)
+
+        # Si el tip tiene más de 7 días, regenerar
+        if tip_obj.should_regenerate():
+            new_tip = generate_weekly_tip(user_id)
+            tip_obj.tip = new_tip
+            tip_obj.created_at = datetime.now()
+            tip_obj.save()
+            return new_tip
+
+        return tip_obj.tip
+
+    except WeeklyTip.DoesNotExist:
+        # No existe, crear uno nuevo
+        new_tip = generate_weekly_tip(user_id)
+        WeeklyTip.objects.create(user_id=user_id, tip=new_tip)
+        return new_tip

@@ -1,7 +1,10 @@
 import google.generativeai as genai
 from moneymind_apps.movements.utils.config import GOOGLE_API_KEY
 import json
-from moneymind_apps.movements.models import Category
+from moneymind_apps.movements.models import *
+from datetime import datetime, timedelta
+from decimal import Decimal
+from django.db.models import Sum, Count, Avg
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
@@ -205,3 +208,113 @@ def analyze_income(image_path: str):
 
     except Exception as e:
         return {"error": f"Ocurrió un problema al analizar el ingreso: {str(e)}", "code": "UNEXPECTED_ERROR"}
+
+
+def generate_weekly_tip(user_id: int) -> str:
+    """
+    Genera un tip personalizado basado en el comportamiento de los últimos 30 días
+    """
+    from datetime import datetime, timedelta
+
+    # Fecha de hace 30 días
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+
+    # 1. Total gastado en últimos 30 días
+    total_spent = Expense.objects.filter(
+        user_id=user_id,
+        date__gte=thirty_days_ago.date()
+    ).aggregate(total=Sum('total'))['total'] or Decimal('0')
+    total_spent = float(total_spent)
+
+    # 2. Categoría con mayor gasto
+    top_category = Expense.objects.filter(
+        user_id=user_id,
+        date__gte=thirty_days_ago.date()
+    ).values('category').annotate(
+        total=Sum('total')
+    ).order_by('-total').first()
+
+    top_category_name = ""
+    top_category_amount = 0
+    if top_category:
+        try:
+            cat_enum = Category(top_category['category'])
+            top_category_name = CATEGORY_LABELS.get(cat_enum, top_category['category'])
+            top_category_amount = float(top_category['total'])
+        except ValueError:
+            pass
+
+    # 3. Promedio de gasto diario
+    days_with_expenses = Expense.objects.filter(
+        user_id=user_id,
+        date__gte=thirty_days_ago.date()
+    ).values('date').distinct().count()
+
+    avg_daily_spend = total_spent / 30 if days_with_expenses > 0 else 0
+
+    # 4. Número de transacciones
+    transaction_count = Expense.objects.filter(
+        user_id=user_id,
+        date__gte=thirty_days_ago.date()
+    ).count()
+
+    # 5. Categorías más frecuentes (top 3)
+    frequent_categories = Expense.objects.filter(
+        user_id=user_id,
+        date__gte=thirty_days_ago.date()
+    ).values('category').annotate(
+        count=Count('id')
+    ).order_by('-count')[:3]
+
+    frequent_categories_list = []
+    for cat in frequent_categories:
+        try:
+            cat_enum = Category(cat['category'])
+            cat_name = CATEGORY_LABELS.get(cat_enum, cat['category'])
+            frequent_categories_list.append(f"{cat_name} ({cat['count']} veces)")
+        except ValueError:
+            pass
+
+    # Crear el prompt para Gemini
+    model = genai.GenerativeModel("gemini-2.0-flash-exp")
+
+    prompt = f"""
+Eres un asesor financiero experto. Genera UN ÚNICO consejo financiero personalizado y práctico basado en estos datos de comportamiento de los últimos 30 días:
+
+DATOS DEL USUARIO:
+- Total gastado: S/ {total_spent:.2f}
+- Categoría con mayor gasto: {top_category_name} (S/ {top_category_amount:.2f})
+- Promedio de gasto diario: S/ {avg_daily_spend:.2f}
+- Número de transacciones: {transaction_count}
+- Categorías más frecuentes: {', '.join(frequent_categories_list) if frequent_categories_list else 'No hay datos'}
+
+INSTRUCCIONES:
+1. Genera un consejo específico y accionable de máximo 2-3 oraciones
+2. El consejo debe estar relacionado directamente con los datos proporcionados
+3. Usa un tono amigable y motivador
+4. Enfócate en el área que más puede mejorar (mayor gasto o más frecuente)
+5. Da recomendaciones concretas y realistas
+6. NO uses emojis
+7. NO uses encabezados ni formato especial
+8. Devuelve SOLO el texto del consejo, sin preámbulos maximo 30 palabras
+
+Ejemplos de buenos consejos:
+- "Has gastado S/ 450 en Entretenimiento este mes. Considera reducir salidas a restaurantes a 2 veces por semana y cocinar más en casa para ahorrar hasta S/ 200."
+- "Tus gastos en Transporte han aumentado un 30%. Evalúa usar transporte público o compartir viajes para reducir costos."
+- "Has realizado 15 compras pequeñas en Alimentación. Planifica tus compras semanalmente para evitar gastos impulsivos."
+
+Genera el consejo ahora:
+"""
+
+    try:
+        response = model.generate_content(prompt)
+        tip = response.text.strip() if response and response.text else "Revisa tus gastos semanalmente para mantener el control de tu presupuesto."
+
+        # Limpiar cualquier formato markdown que pudiera venir
+        tip = tip.replace('**', '').replace('*', '').replace('#', '').strip()
+
+        return tip
+
+    except Exception as e:
+        print(f"Error generando tip con Gemini: {str(e)}")
+        return "Revisa tus gastos semanalmente y ajusta tu presupuesto según tus necesidades."
