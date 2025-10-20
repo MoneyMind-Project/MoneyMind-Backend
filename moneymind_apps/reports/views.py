@@ -8,6 +8,7 @@ from moneymind_apps.users.models import User
 from django.utils import timezone
 from moneymind_apps.reports.models import *
 from moneymind_apps.movements.utils.services.gemini_api import *
+from moneymind_apps.alerts.views import get_recurring_payment_reminders
 
 
 class DashboardOverviewView(APIView):
@@ -200,8 +201,8 @@ class HomeDashboardView(APIView):
         # 4. Obtener gastos diarios del mes
         daily_expenses = self._get_daily_expenses(user_id, current_month, current_year)
 
-        # 5. Obtener próximos pagos (temporal - array vacío)
-        upcoming_payments = self._get_upcoming_payments()
+        # 5. Obtener próximos pagos (reutilizando la lógica de alerts)
+        upcoming_payments = get_recurring_payment_reminders(user_id)
 
         return Response(
             {
@@ -291,13 +292,6 @@ class HomeDashboardView(APIView):
             })
 
         return daily_data
-
-    def _get_upcoming_payments(self):
-        """
-        Próximos pagos/deudas (temporal - array vacío)
-        TODO: Implementar modelo de Payments/Debts
-        """
-        return []
 
 class MonthlyExpensesPredictionView(APIView):
     permission_classes = [AllowAny]

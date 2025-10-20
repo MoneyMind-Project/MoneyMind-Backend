@@ -322,7 +322,6 @@ class ScanDashboardView(APIView):
             status=status.HTTP_200_OK
         )
 
-
 class AllMovementsOptimizedView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
