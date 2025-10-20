@@ -279,16 +279,10 @@ class RecurringPaymentReminderCreateView(APIView):
 class RecurringPaymentReminderListView(APIView):
     """
     Retorna los recordatorios que deben mostrarse para el usuario en una fecha dada.
-    Se muestran si:
-      - El recordatorio está activo.
-      - La fecha actual está dentro de los 3 días previos (incluyendo el día exacto) al día de pago.
-      - No ha sido marcado como pagado este mes.
-      - La fecha de consulta es >= start_date
     """
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # Obtener parámetros obligatorios
         try:
             user_id = int(request.query_params.get("user_id"))
         except (TypeError, ValueError):
@@ -297,7 +291,6 @@ class RecurringPaymentReminderListView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Obtener fecha desde los parámetros, si no se mandan usar hoy
         try:
             day = int(request.query_params.get("day", now().date().day))
             month = int(request.query_params.get("month", now().date().month))
@@ -312,27 +305,48 @@ class RecurringPaymentReminderListView(APIView):
         reminders = RecurringPaymentReminder.objects.filter(
             user_id=user_id,
             is_active=True,
-            start_date__lte=current_date  # 👈 NUEVO: Solo recordatorios que ya iniciaron
+            start_date__lte=current_date
         )
 
         reminders_to_alert = []
         for reminder in reminders:
-            # 👈 NUEVO: Verificar si ya fue pagado este mes
+            from datetime import timedelta
+            from dateutil.relativedelta import relativedelta
+
+            # Construir la fecha de pago para el mes actual
+            try:
+                payment_date_this_month = date(year, month, reminder.payment_day)
+            except ValueError:
+                # Si el payment_day no existe en este mes (ej: día 31 en febrero)
+                # usar el último día del mes
+                import calendar
+                last_day = calendar.monthrange(year, month)[1]
+                payment_date_this_month = date(year, month, last_day)
+
+            # Si la fecha de pago ya pasó en este mes, usar el próximo mes
+            if current_date > payment_date_this_month:
+                # Calcular fecha de pago del siguiente mes
+                next_month_date = payment_date_this_month + relativedelta(months=1)
+                payment_date_to_check = next_month_date
+                target_month = next_month_date.month
+                target_year = next_month_date.year
+            else:
+                # La fecha de pago aún no ha pasado este mes
+                payment_date_to_check = payment_date_this_month
+                target_month = month
+                target_year = year
+
+            # Verificar si ya fue pagado en el período objetivo
             if reminder.last_payment_date:
-                # Si la última fecha de pago corresponde al período de pago actual, skip
-                if (reminder.last_payment_date.year == year and
-                        reminder.last_payment_date.month == month):
+                if (reminder.last_payment_date.year == target_year and
+                        reminder.last_payment_date.month == target_month):
                     continue
 
-            # 👈 NUEVO: Calcular la fecha de pago para este mes
-            payment_date_this_month = date(year, month, reminder.payment_day)
+            # Calcular el rango de alertas (3 días antes incluyendo el día)
+            alert_start_date = payment_date_to_check - timedelta(days=2)
+            alert_end_date = payment_date_to_check
 
-            # 👈 NUEVO: Calcular el rango de alertas (3 días antes incluyendo el día)
-            from datetime import timedelta
-            alert_start_date = payment_date_this_month - timedelta(days=3)
-            alert_end_date = payment_date_this_month
-
-            # 👈 NUEVO: Verificar si la fecha actual está en el rango de alerta
+            # Verificar si la fecha actual está en el rango de alerta
             if alert_start_date <= current_date <= alert_end_date:
                 reminders_to_alert.append(reminder)
 
