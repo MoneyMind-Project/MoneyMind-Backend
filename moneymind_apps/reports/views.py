@@ -86,6 +86,7 @@ class DashboardOverviewView(APIView):
 
         # 4. Proyección del próximo mes (promedio de últimos 3 meses)
         last_3_months_totals = []
+
         for i in range(1, 4):
             target_month = month - i
             target_year = year
@@ -102,9 +103,17 @@ class DashboardOverviewView(APIView):
 
             last_3_months_totals.append(float(month_total))
 
-        if last_3_months_totals:
-            proyeccion = sum(last_3_months_totals) / len(last_3_months_totals)
+        # 🔹 Lógica mejorada de proyección
+        valid_months = [v for v in last_3_months_totals if v > 0]
+
+        if len(valid_months) >= 2:
+            # Promedio de los meses que sí tienen datos
+            proyeccion = sum(valid_months) / len(valid_months)
+        elif len(valid_months) == 1:
+            # Si solo hay un mes, usa ese valor (lo repetimos virtualmente)
+            proyeccion = valid_months[0]
         else:
+            # Si no hay ningún dato previo, usa el gasto actual como referencia
             proyeccion = float(total_gastado)
 
         # Verificar y crear alerta si es necesario
@@ -151,7 +160,7 @@ class DashboardOverviewView(APIView):
                     Alert.objects.create(
                         user_id=user_id,
                         alert_type=AlertType.RISK.value,
-                        message=f"Has gastado el {porcentaje:.1f}% de tu presupuesto inicial este mes (S/ {presupuesto_inicial_mes:.2f}). Te quedan S/ {restante:.2f}",
+                        message=f"Has gastado 2/3 de tu presupuesto inicial este mes (S/ {presupuesto_inicial_mes:.2f}).",
                         target_month=month,
                         target_year=year,
                         seen=False
