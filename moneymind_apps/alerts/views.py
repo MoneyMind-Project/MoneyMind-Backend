@@ -283,6 +283,7 @@ class RecurringPaymentReminderListView(APIView):
       - El recordatorio está activo.
       - La fecha actual está dentro de los 3 días previos (incluyendo el día exacto) al día de pago.
       - No ha sido marcado como pagado este mes.
+      - La fecha de consulta es >= start_date
     """
     permission_classes = [AllowAny]
 
@@ -310,21 +311,29 @@ class RecurringPaymentReminderListView(APIView):
 
         reminders = RecurringPaymentReminder.objects.filter(
             user_id=user_id,
-            is_active=True
+            is_active=True,
+            start_date__lte=current_date  # 👈 NUEVO: Solo recordatorios que ya iniciaron
         )
 
         reminders_to_alert = []
         for reminder in reminders:
-            # Saltar si ya fue pagado este mes
-            if reminder.last_payment_date and reminder.last_payment_date.month == month and reminder.last_payment_date.year == year:
-                continue
+            # 👈 NUEVO: Verificar si ya fue pagado este mes
+            if reminder.last_payment_date:
+                # Si la última fecha de pago corresponde al período de pago actual, skip
+                if (reminder.last_payment_date.year == year and
+                        reminder.last_payment_date.month == month):
+                    continue
 
-            # Calcular rango de alerta (3 días antes del día de pago)
-            alert_start = reminder.payment_day - 3
-            if alert_start < 1:
-                alert_start = 1
+            # 👈 NUEVO: Calcular la fecha de pago para este mes
+            payment_date_this_month = date(year, month, reminder.payment_day)
 
-            if alert_start <= day <= reminder.payment_day:
+            # 👈 NUEVO: Calcular el rango de alertas (3 días antes incluyendo el día)
+            from datetime import timedelta
+            alert_start_date = payment_date_this_month - timedelta(days=3)
+            alert_end_date = payment_date_this_month
+
+            # 👈 NUEVO: Verificar si la fecha actual está en el rango de alerta
+            if alert_start_date <= current_date <= alert_end_date:
                 reminders_to_alert.append(reminder)
 
         serializer = RecurringPaymentSerializer(reminders_to_alert, many=True)
