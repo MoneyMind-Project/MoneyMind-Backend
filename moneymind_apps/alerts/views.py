@@ -4,6 +4,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework import status
 from moneymind_apps.alerts.models import *
 from django.shortcuts import get_object_or_404
+from moneymind_apps.alerts.serializer import *
+from django.utils.timezone import now
+from datetime import date
 
 class UserAlertsView(APIView):
     permission_classes = [AllowAny]
@@ -247,3 +250,123 @@ class MarkAllRiskAlertsAsSeenView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class RecurringPaymentReminderCreateView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RecurringPaymentSerializer(data=request.data)
+
+        if serializer.is_valid():
+            recurring_payment = serializer.save()
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Pago recurrente creado exitosamente",
+                    "data": RecurringPaymentSerializer(recurring_payment).data
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+class RecurringPaymentReminderListView(APIView):
+    """
+    Retorna los recordatorios que deben mostrarse para el usuario en una fecha dada.
+    Se muestran si:
+      - El recordatorio está activo.
+      - La fecha actual está dentro de los 3 días previos (incluyendo el día exacto) al día de pago.
+      - No ha sido marcado como pagado este mes.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        # Obtener parámetros obligatorios
+        try:
+            user_id = int(request.query_params.get("user_id"))
+        except (TypeError, ValueError):
+            return Response(
+                {"success": False, "error": "El parámetro user_id es obligatorio y debe ser un número."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Obtener fecha desde los parámetros, si no se mandan usar hoy
+        try:
+            day = int(request.query_params.get("day", now().date().day))
+            month = int(request.query_params.get("month", now().date().month))
+            year = int(request.query_params.get("year", now().date().year))
+            current_date = date(year, month, day)
+        except ValueError:
+            return Response(
+                {"success": False, "error": "Los parámetros de fecha son inválidos."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        reminders = RecurringPaymentReminder.objects.filter(
+            user_id=user_id,
+            is_active=True
+        )
+
+        reminders_to_alert = []
+        for reminder in reminders:
+            # Saltar si ya fue pagado este mes
+            if reminder.last_payment_date and reminder.last_payment_date.month == month and reminder.last_payment_date.year == year:
+                continue
+
+            # Calcular rango de alerta (3 días antes del día de pago)
+            alert_start = reminder.payment_day - 3
+            if alert_start < 1:
+                alert_start = 1
+
+            if alert_start <= day <= reminder.payment_day:
+                reminders_to_alert.append(reminder)
+
+        serializer = RecurringPaymentSerializer(reminders_to_alert, many=True)
+
+        return Response(
+            {
+                "success": True,
+                "count": len(reminders_to_alert),
+                "date_checked": current_date.strftime("%Y-%m-%d"),
+                "data": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
+class RecurringPaymentMarkPaidView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, reminder_id):
+        try:
+            reminder = RecurringPaymentReminder.objects.get(id=reminder_id)
+        except RecurringPaymentReminder.DoesNotExist:
+            return Response(
+                {"success": False, "message": "Recordatorio no encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Evita marcar dos veces el mismo día
+        if reminder.last_payment_date == date.today():
+            return Response(
+                {"success": False, "message": "El pago ya fue marcado como realizado hoy."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Marcar como pagado hoy
+        reminder.last_payment_date = date.today()
+        reminder.save()
+
+        return Response(
+            {
+                "success": True,
+                "message": f"Pago de '{reminder.name}' marcado como realizado el {reminder.last_payment_date}.",
+                "data": RecurringPaymentSerializer(reminder).data
+            },
+            status=status.HTTP_200_OK
+        )

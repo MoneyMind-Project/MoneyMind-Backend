@@ -13,7 +13,6 @@ class CategoryParent(Enum):
     EDUCACION = "educacion"
     OTROS = "otros"
 
-
 class Category(Enum):
     # GASTOS_ESENCIALES
     VIVIENDA = "vivienda"
@@ -40,7 +39,6 @@ class Category(Enum):
     REGALOS_CELEBRACIONES = "regalos_celebraciones"
     VIAJES_VACACIONES = "viajes_vacaciones"
     IMPREVISTOS = "imprevistos"
-
 
 # Mapeo de categorías a sus padres
 CATEGORY_PARENT_MAP = {
@@ -169,3 +167,5 @@ class Income(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.total} ({self.date})"
+
+
