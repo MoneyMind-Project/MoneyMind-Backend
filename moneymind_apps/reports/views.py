@@ -1061,12 +1061,19 @@ class ExportReportView(APIView):
         # Datos
         for movement in data['movements']:
             amount = movement['amount'] if movement['is_income'] else -movement['amount']
+
+            category = movement.get('category', '')  # Evita KeyError
+            if category:
+                category = category.replace('_', ' ').title()
+
+            description = movement.get('description', '')  # También lo protegemos
+
             ws_movements.append([
                 movement['date'].strftime('%d/%m/%Y'),
                 movement['time'],
                 movement['type'],
-                movement['category'].replace('_', ' ').title(),
-                movement['description'],
+                category,  # ← Nunca causará error
+                description,  # ← Protegido también
                 amount
             ])
 
