@@ -9,6 +9,7 @@ from django.utils import timezone
 from moneymind_apps.reports.models import *
 from moneymind_apps.movements.utils.services.gemini_api import *
 from moneymind_apps.alerts.views import get_recurring_payment_reminders
+import math
 
 
 class DashboardOverviewView(APIView):
@@ -116,6 +117,9 @@ class DashboardOverviewView(APIView):
         else:
             # Si no hay ningún dato previo, usa el gasto actual como referencia
             proyeccion = float(total_gastado)
+
+        # 🔸 Redondear hacia arriba si tiene decimales
+        proyeccion = math.ceil(proyeccion)
 
         # Verificar y crear alerta si es necesario
         # 👈 CAMBIO: Pasar presupuesto_inicial_mes en lugar de presupuesto_restante
