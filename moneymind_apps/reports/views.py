@@ -857,8 +857,7 @@ class ExportReportView(APIView):
                 'date': income.date,
                 'time': income.time,
                 'type': 'Ingreso',
-                'category': income.category,
-                'description': income.place,
+                'description': income.title,
                 'amount': float(income.total),
                 'is_income': True
             })
@@ -1240,11 +1239,16 @@ class ExportReportView(APIView):
 
             for mov in movements_display:
                 amount_str = f"+S/ {mov['amount']:,.2f}" if mov['is_income'] else f"-S/ {mov['amount']:,.2f}"
+
+                category = mov.get('category', '')  # ← Si no existe, devuelve ''
+                if category:
+                    category = category.replace('_', ' ').title()[:15]
+
                 movement_data.append([
                     mov['date'].strftime('%d/%m/%Y'),
                     mov['time'],
                     mov['type'],
-                    mov['category'].replace('_', ' ').title()[:15],  # Truncar si es muy largo
+                    category,  # ← Ya nunca causará KeyError
                     amount_str
                 ])
 
