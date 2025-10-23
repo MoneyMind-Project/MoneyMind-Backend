@@ -278,6 +278,24 @@ class RecurringPaymentReminderCreateView(APIView):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+class RecurringPaymentReminderListByUserView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            user_id = int(request.query_params.get("user_id"))
+        except (TypeError, ValueError):
+            return Response(
+                {"success": False, "error": "El parámetro user_id es obligatorio y debe ser un número."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 🔹 Filtrar los recordatorios del usuario
+        reminders = RecurringPaymentReminder.objects.filter(user_id=user_id)
+
+        # 🔹 Serializar los resultados
+        serializer = RecurringPaymentSerializer(reminders, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class RecurringPaymentReminderListView(APIView):
     permission_classes = [AllowAny]
