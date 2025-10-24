@@ -348,6 +348,57 @@ class RecurringPaymentMarkPaidView(APIView):
             status=status.HTTP_200_OK
         )
 
+class RecurringPaymentUpdateView(APIView):
+    permission_classes = [AllowAny]
+
+    def patch(self, request, reminder_id):
+        try:
+            reminder = RecurringPaymentReminder.objects.get(id=reminder_id)
+        except RecurringPaymentReminder.DoesNotExist:
+            return Response(
+                {"success": False, "message": "Recordatorio no encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = RecurringPaymentSerializer(reminder, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "success": True,
+                    "message": f"Recordatorio '{reminder.name}' actualizado correctamente.",
+                    "data": serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+class RecurringPaymentDeleteView(APIView):
+    permission_classes = [AllowAny]
+
+    def delete(self, request, reminder_id):
+        try:
+            reminder = RecurringPaymentReminder.objects.get(id=reminder_id)
+        except RecurringPaymentReminder.DoesNotExist:
+            return Response(
+                {"success": False, "message": "Recordatorio no encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        reminder.delete()
+        return Response(
+            {
+                "success": True,
+                "message": f"Recordatorio '{reminder.name}' eliminado correctamente."
+            },
+            status=status.HTTP_200_OK
+        )
+
+
 
 def get_recurring_payment_reminders(user_id: int, day=None, month=None, year=None):
     """

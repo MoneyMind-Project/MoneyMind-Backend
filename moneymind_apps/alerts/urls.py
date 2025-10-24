@@ -10,4 +10,6 @@ urlpatterns = [
     path('recurring-payments/all/', RecurringPaymentReminderListByUserView.as_view(), name='recurring-payment-list-all'),
     path('recurring-payments/list/', RecurringPaymentReminderListView.as_view(), name='recurring-payment-list'),
     path('recurring-payments/<int:reminder_id>/mark-paid/', RecurringPaymentMarkPaidView.as_view(), name='mark-recurring-paid'),
+    path('recurring-payments/<int:reminder_id>/update/', RecurringPaymentUpdateView.as_view(), name='recurring-payment-update'),
+    path('recurring-payments/<int:reminder_id>/delete/', RecurringPaymentDeleteView.as_view(), name='recurring-payment-delete'),
 ]

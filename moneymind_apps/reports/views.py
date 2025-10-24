@@ -37,6 +37,249 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 
 
+class UnifiedDashboardAnalyticsView(APIView):
+    permission_classes = [AllowAny]
+    """
+    Endpoint unificado que devuelve todos los datos de analytics del dashboard
+    en una sola respuesta, optimizando las llamadas al backend.
+    """
+
+    def get(self, request):
+        user_id = request.query_params.get('user_id')
+        year = request.query_params.get('year', None)
+        month = request.query_params.get('month', None)
+
+        if not user_id:
+            return Response(
+                {"error": "user_id es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Usar año actual si no se proporciona
+            if not year:
+                year = datetime.now().year
+            else:
+                year = int(year)
+
+            # Usar mes actual si no se proporciona
+            if not month:
+                month = datetime.now().month
+            else:
+                month = int(month)
+                if month < 1 or month > 12:
+                    raise ValueError("Mes inválido")
+
+        except ValueError as e:
+            return Response(
+                {"error": f"Parámetros inválidos: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        current_date = datetime.now()
+        current_month = current_date.month if current_date.year == year else 12
+
+        # Construir respuesta unificada
+        analytics_data = {
+            "success": True,
+            "user_id": user_id,
+            "year": year,
+            "month": month,
+            "current_month": current_month,
+            "data": {
+                "monthly_predictions": self._get_monthly_predictions(user_id, year, current_month),
+                "expenses_by_category": self._get_expenses_by_category(user_id, month, year),
+                "expenses_by_parent_category": self._get_expenses_by_parent_category(user_id, month, year),
+                "savings_evolution": self._get_savings_evolution(user_id, year),
+                "essential_vs_non_essential": self._get_essential_vs_non_essential(user_id, year)
+            }
+        }
+
+        return Response(analytics_data, status=status.HTTP_200_OK)
+
+    def _get_monthly_predictions(self, user_id, year, current_month):
+        """
+        Predicciones de gastos mensuales
+        """
+        monthly_expenses = []
+
+        for month in range(1, 13):
+            month_total = Expense.objects.filter(
+                user_id=user_id,
+                date__month=month,
+                date__year=year
+            ).aggregate(total=Sum('total'))['total']
+
+            monthly_expenses.append({
+                "month": month,
+                "real": float(month_total) if month_total else None
+            })
+
+        # Calcular predicción
+        months_with_data = [m for m in monthly_expenses if m["real"] is not None and m["real"] > 0]
+
+        if len(months_with_data) >= 3:
+            last_3_months = months_with_data[-3:]
+            avg_expense = sum(m["real"] for m in last_3_months) / 3
+        elif len(months_with_data) > 0:
+            avg_expense = sum(m["real"] for m in months_with_data) / len(months_with_data)
+        else:
+            avg_expense = 0
+
+        current_month_value = monthly_expenses[current_month - 1]["real"] if current_month <= 12 else None
+
+        predictions = []
+        for i, month_data in enumerate(monthly_expenses):
+            month = month_data["month"]
+
+            if month < current_month:
+                predictions.append(None)
+            elif month == current_month:
+                predictions.append(current_month_value)
+            else:
+                months_ahead = month - current_month
+                base_value = current_month_value if current_month_value else avg_expense
+                predicted_value = base_value * (1.02 ** months_ahead)
+                predictions.append(round(predicted_value, 2))
+
+        result = []
+        for i, month_data in enumerate(monthly_expenses):
+            result.append({
+                "month": month_data["month"],
+                "real": month_data["real"],
+                "prediction": predictions[i]
+            })
+
+        return result
+
+    def _get_expenses_by_category(self, user_id, month, year):
+        """
+        Gastos por categoría (16 categorías)
+        """
+        expenses = Expense.objects.filter(
+            user_id=user_id,
+            date__month=month,
+            date__year=year
+        )
+
+        category_totals = expenses.values('category').annotate(
+            total=Sum('total')
+        )
+
+        all_categories = {cat.value: 0 for cat in Category}
+
+        for item in category_totals:
+            all_categories[item['category']] = float(item['total'])
+
+        result = [
+            {
+                "category": category,
+                "total": total
+            }
+            for category, total in all_categories.items()
+        ]
+
+        return result
+
+    def _get_expenses_by_parent_category(self, user_id, month, year):
+        """
+        Gastos por categoría padre (4 grupos principales)
+        """
+        expenses = Expense.objects.filter(
+            user_id=user_id,
+            date__month=month,
+            date__year=year
+        )
+
+        parent_totals = {parent.value: 0 for parent in CategoryParent}
+
+        for expense in expenses:
+            try:
+                category = Category(expense.category)
+                parent_category = CATEGORY_PARENT_MAP.get(category)
+
+                if parent_category:
+                    parent_totals[parent_category.value] += float(expense.total)
+
+            except ValueError:
+                continue
+
+        result = [
+            {
+                "parent_category": parent_category,
+                "total": total
+            }
+            for parent_category, total in parent_totals.items()
+        ]
+
+        return result
+
+    def _get_savings_evolution(self, user_id, year):
+        """
+        Evolución del ahorro mes a mes
+        """
+        history = UserBalanceHistory.objects.filter(
+            user_id=user_id,
+            date__year=year
+        ).order_by('date')
+
+        monthly_savings = []
+        previous_amount = None
+
+        for record in history:
+            if previous_amount is not None:
+                saving = float(record.amount) - previous_amount
+            else:
+                saving = 0
+
+            monthly_savings.append({
+                "month": record.date.month,
+                "date": record.date.isoformat(),
+                "balance": float(record.amount),
+                "saving": saving
+            })
+
+            previous_amount = float(record.amount)
+
+        return monthly_savings
+
+    def _get_essential_vs_non_essential(self, user_id, year):
+        """
+        Gastos esenciales vs no esenciales por mes
+        """
+        monthly_data = []
+
+        for month in range(1, 13):
+            expenses = Expense.objects.filter(
+                user_id=user_id,
+                date__month=month,
+                date__year=year
+            )
+
+            esencial_total = 0
+            no_esencial_total = 0
+
+            for expense in expenses:
+                try:
+                    category = Category(expense.category)
+                    expense_type = CATEGORY_EXPENSE_TYPE_MAP.get(category)
+
+                    if expense_type == ExpenseType.ESENCIAL:
+                        esencial_total += float(expense.total)
+                    elif expense_type == ExpenseType.NO_ESENCIAL:
+                        no_esencial_total += float(expense.total)
+
+                except ValueError:
+                    continue
+
+            monthly_data.append({
+                "month": month,
+                "esencial": esencial_total,
+                "no_esencial": no_esencial_total
+            })
+
+        return monthly_data
+
 
 class DashboardOverviewView(APIView):
     permission_classes = [AllowAny]
