@@ -5,6 +5,7 @@ from rest_framework import status
 from moneymind_apps.balances.models import *
 from moneymind_apps.alerts.models import Alert, AlertType
 from moneymind_apps.users.models import *
+from moneymind_apps.movements.utils.services.gemini_api import _generate_all_chart_comments
 from django.utils import timezone
 from moneymind_apps.reports.models import *
 from moneymind_apps.movements.utils.services.gemini_api import *
@@ -91,9 +92,33 @@ class UnifiedDashboardAnalyticsView(APIView):
                 "expenses_by_category": self._get_expenses_by_category(user_id, month, year),
                 "expenses_by_parent_category": self._get_expenses_by_parent_category(user_id, month, year),
                 "savings_evolution": self._get_savings_evolution(user_id, year),
-                "essential_vs_non_essential": self._get_essential_vs_non_essential(user_id, year)
+                "essential_vs_non_essential": self._get_essential_vs_non_essential(user_id, year),
             }
         }
+
+        # 🔹 Generar los textos explicativos con Gemini en una sola llamada
+        try:
+            chart_data_list = [
+                analytics_data["data"]["monthly_predictions"],
+                analytics_data["data"]["expenses_by_category"],
+                analytics_data["data"]["expenses_by_parent_category"],
+                analytics_data["data"]["savings_evolution"],
+                analytics_data["data"]["essential_vs_non_essential"]
+            ]
+
+            comments = _generate_all_chart_comments(chart_data_list)
+
+            # Asignar los comentarios a cada dataset
+            (
+                analytics_data["data"]["monthly_predictions_comment"],
+                analytics_data["data"]["expenses_by_category_comment"],
+                analytics_data["data"]["expenses_by_parent_category_comment"],
+                analytics_data["data"]["savings_evolution_comment"],
+                analytics_data["data"]["essential_vs_non_essential_comment"],
+            ) = comments
+
+        except Exception as e:
+            print(f"Error generando comentarios de IA: {e}")
 
         return Response(analytics_data, status=status.HTTP_200_OK)
 

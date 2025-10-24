@@ -318,3 +318,45 @@ Genera el consejo ahora:
     except Exception as e:
         print(f"Error generando tip con Gemini: {str(e)}")
         return "Revisa tus gastos semanalmente y ajusta tu presupuesto según tus necesidades."
+
+def _generate_all_chart_comments(chart_data_list):
+    """
+    Genera 5 comentarios en una sola llamada a Gemini.
+    Retorna una lista de 5 strings.
+    """
+    prompt = f"""
+    Eres un asistente experto en análisis de datos financieros y reportes.
+    A continuación tienes 5 conjuntos de datos representando distintos gráficos.
+
+    Por favor genera una breve descripción (una solo parrafo) para cada gráfico.
+    Devuelve los 5 resultados en formato texto, separados exactamente por el delimitador '||'.
+
+    1️⃣ Gráfico 1: {chart_data_list[0]}
+    2️⃣ Gráfico 2: {chart_data_list[1]}
+    3️⃣ Gráfico 3: {chart_data_list[2]}
+    4️⃣ Gráfico 4: {chart_data_list[3]}
+    5️⃣ Gráfico 5: {chart_data_list[4]}
+
+    Ejemplo de salida esperada:
+    "Las ventas aumentaron un 20% este mes.||Los gastos se mantuvieron estables.||..."
+    (Se detallista con los datos, usa aproximadamente 30 a 40 palabras para la descripcion)
+    """
+
+    model = genai.GenerativeModel("gemini-2.0-flash-exp")
+
+    try:
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        comments = [c.strip() for c in text.split("||")]
+
+        # Asegura que devuelva exactamente 5 elementos
+        while len(comments) < 5:
+            comments.append("Comentario no disponible")
+
+        return comments[:5]
+
+    except Exception as e:
+        print("Error en _generate_all_chart_comments:", e)
+        return ["Error al generar comentario"] * 5
+
+
