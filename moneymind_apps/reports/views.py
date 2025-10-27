@@ -92,33 +92,9 @@ class UnifiedDashboardAnalyticsView(APIView):
                 "expenses_by_category": self._get_expenses_by_category(user_id, month, year),
                 "expenses_by_parent_category": self._get_expenses_by_parent_category(user_id, month, year),
                 "savings_evolution": self._get_savings_evolution(user_id, year),
-                "essential_vs_non_essential": self._get_essential_vs_non_essential(user_id, year),
+                "essential_vs_non_essential": self._get_essential_vs_non_essential(user_id, year)
             }
         }
-
-        # 🔹 Generar los textos explicativos con Gemini en una sola llamada
-        try:
-            chart_data_list = [
-                analytics_data["data"]["monthly_predictions"],
-                analytics_data["data"]["expenses_by_category"],
-                analytics_data["data"]["expenses_by_parent_category"],
-                analytics_data["data"]["savings_evolution"],
-                analytics_data["data"]["essential_vs_non_essential"]
-            ]
-
-            comments = _generate_all_chart_comments(chart_data_list)
-
-            # Asignar los comentarios a cada dataset
-            (
-                analytics_data["data"]["monthly_predictions_comment"],
-                analytics_data["data"]["expenses_by_category_comment"],
-                analytics_data["data"]["expenses_by_parent_category_comment"],
-                analytics_data["data"]["savings_evolution_comment"],
-                analytics_data["data"]["essential_vs_non_essential_comment"],
-            ) = comments
-
-        except Exception as e:
-            print(f"Error generando comentarios de IA: {e}")
 
         return Response(analytics_data, status=status.HTTP_200_OK)
 
@@ -304,6 +280,39 @@ class UnifiedDashboardAnalyticsView(APIView):
             })
 
         return monthly_data
+
+
+class GenerateChartCommentsView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+
+        try:
+            chart_data_list = request.data.get("chart_data_list", None)
+
+            if not chart_data_list or not isinstance(chart_data_list, list) or len(chart_data_list) != 5:
+                return Response(
+                    {"error": "Se requiere una lista con exactamente 5 conjuntos de datos."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            comments = _generate_all_chart_comments(chart_data_list)
+
+            return Response(
+                {"success": True, "comments": comments},
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            print("🔥 Error en GenerateChartCommentsView:", str(e))
+            import traceback
+            traceback.print_exc()
+
+            return Response(
+                {"success": False, "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 
 class DashboardOverviewView(APIView):

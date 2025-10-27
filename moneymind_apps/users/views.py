@@ -110,13 +110,19 @@ class UpdateUserProfileView(APIView):
 
         # Validar user_id
         if not user_id:
-            return Response({"error": "user_id es requerido"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "user_id es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Buscar usuario
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return Response({"error": "Usuario no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Usuario no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         # Actualizar campos del usuario si vienen en el request
         if first_name is not None:
@@ -130,21 +136,47 @@ class UpdateUserProfileView(APIView):
 
         user.save()
 
-        # Actualizar el monthly_income si viene en el request
+        # Actualizar el monthly_income en Balance si viene en el request
         if monthly_income is not None:
             try:
-                update_monthly_income(user.id, monthly_income)
-            except ValueError as e:
-                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                # Buscar o crear el Balance del usuario
+                balance, created = Balance.objects.get_or_create(
+                    user=user,
+                    defaults={
+                        'current_amount': 0,
+                        'monthly_income': monthly_income
+                    }
+                )
+
+                # Si ya existía, solo actualizar monthly_income
+                if not created:
+                    balance.monthly_income = monthly_income
+                    balance.save()
+
+            except Exception as e:
+                return Response(
+                    {"error": f"Error al actualizar ingreso mensual: {str(e)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Obtener el balance actualizado para devolverlo
+        try:
+            balance = Balance.objects.get(user=user)
+            monthly_income_value = balance.monthly_income
+        except Balance.DoesNotExist:
+            monthly_income_value = None
 
         return Response({
+            "success": True,
             "message": "Perfil actualizado correctamente",
             "user": {
                 "id": user.id,
+                "email": user.email,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
                 "gender": user.gender,
                 "birth_date": user.birth_date,
+                "plan": user.plan
             },
-            "monthly_income": monthly_income
+            "monthly_income": float(monthly_income_value) if monthly_income_value else None
         }, status=status.HTTP_200_OK)

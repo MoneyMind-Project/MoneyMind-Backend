@@ -75,7 +75,6 @@ class UserAlertsView(APIView):
             status=status.HTTP_200_OK
         )
 
-
 class UserAlertsPaginationView(APIView):
     permission_classes = [AllowAny]
     """
@@ -216,7 +215,6 @@ class MarkAlertAsSeenView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-
 class MarkAllRiskAlertsAsSeenView(APIView):
     permission_classes = [AllowAny]
     """
@@ -253,7 +251,6 @@ class MarkAllRiskAlertsAsSeenView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 class RecurringPaymentReminderCreateView(APIView):
     permission_classes = [AllowAny]
