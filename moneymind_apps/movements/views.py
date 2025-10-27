@@ -155,6 +155,7 @@ class IncomeCreateView(APIView):
             date = serializer.validated_data["date"]
             time = serializer.validated_data["time"]
             total = serializer.validated_data["total"]
+            is_recurring = serializer.validated_data.get("is_recurring", False)
 
             # 🔎 Verificar duplicado
             exists = Income.objects.filter(
@@ -162,7 +163,8 @@ class IncomeCreateView(APIView):
                 title=title,
                 date=date,
                 time=time,
-                total=total
+                total=total,
+                is_recurring=is_recurring
             ).exists()
 
             if exists:

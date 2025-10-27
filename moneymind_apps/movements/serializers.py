@@ -44,6 +44,7 @@ class IncomeSerializer(serializers.ModelSerializer):
             "time",
             "total",
             "comment",
+            'is_recurring',
             "created_at",
         ]
         read_only_fields = ["id", "user", "created_at"]
