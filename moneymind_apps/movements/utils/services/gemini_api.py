@@ -331,11 +331,11 @@ def _generate_all_chart_comments(chart_data_list):
     Por favor genera una breve descripción (una solo parrafo) para cada gráfico.
     Devuelve los 5 resultados en formato texto, separados exactamente por el delimitador '||'.
 
-    1️⃣ Gráfico 1: {chart_data_list[0]}
-    2️⃣ Gráfico 2: {chart_data_list[1]}
-    3️⃣ Gráfico 3: {chart_data_list[2]}
-    4️⃣ Gráfico 4: {chart_data_list[3]}
-    5️⃣ Gráfico 5: {chart_data_list[4]}
+    1️⃣ Gráfico de predicción de gastos por mes: {chart_data_list[0]}
+    2️⃣ Gráfico de distribución de gastos por minicategorías: {chart_data_list[1]}
+    3️⃣ Gráfico de proporción de categorías padres: {chart_data_list[2]}
+    4️⃣ Gráfico de evolución de ahorro: {chart_data_list[3]}
+    5️⃣ Gráfico de gastos esenciales vs no esenciales: {chart_data_list[4]}
 
     Ejemplo de salida esperada:
     "Las ventas aumentaron un 20% este mes.||Los gastos se mantuvieron estables.||..."

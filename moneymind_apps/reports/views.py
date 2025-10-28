@@ -313,8 +313,6 @@ class GenerateChartCommentsView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-
-
 class DashboardOverviewView(APIView):
     permission_classes = [AllowAny]
     """
@@ -986,7 +984,6 @@ class EssentialVsNonEssentialExpensesView(APIView):
             status=status.HTTP_200_OK
         )
 
-
 def get_or_generate_weekly_tip(user_id: int) -> str:
     """
     Obtiene el tip semanal del usuario o genera uno nuevo si no existe o está vencido
@@ -1009,7 +1006,6 @@ def get_or_generate_weekly_tip(user_id: int) -> str:
         new_tip = generate_weekly_tip(user_id)
         WeeklyTip.objects.create(user_id=user_id, tip=new_tip)
         return new_tip
-
 
 class ExportReportView(APIView):
     permission_classes = [AllowAny]
