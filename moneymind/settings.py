@@ -26,8 +26,9 @@ SECRET_KEY = 'django-insecure-@e0kol4bl-wx+jee9$*6rvkrv+7xbxxy34)=7%365fqpj+e+=c
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1'
+    "localhost",
+    "127.0.0.1",
+    "moneymind-pe.netlify.app",
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -63,7 +64,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+
+CORS_ALLOWED_ORIGINS = [
+    "https://moneymind-pe.netlify.app",
+    "http://localhost:4200",  # para desarrollo local
+]
 
 CORS_ALLOW_HEADERS = [
     "accept",

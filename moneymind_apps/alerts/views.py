@@ -10,6 +10,7 @@ from datetime import date
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 import calendar
+from moneymind_apps.alerts.utils.onesignal_notifications import *
 
 class UserAlertsView(APIView):
     permission_classes = [AllowAny]
@@ -261,6 +262,9 @@ class RecurringPaymentReminderCreateView(APIView):
         if serializer.is_valid():
             recurring_payment = serializer.save()
 
+            # Programar notificaciones
+            schedule_recurring_payment_notifications(recurring_payment.user, recurring_payment)
+
             return Response(
                 {
                     "success": True,
@@ -394,8 +398,6 @@ class RecurringPaymentDeleteView(APIView):
             },
             status=status.HTTP_200_OK
         )
-
-
 
 def get_recurring_payment_reminders(user_id: int, day=None, month=None, year=None):
     """

@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from .models import User
-from .serializers import UserSerializer
+from .serializers import *
 from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
 from moneymind_apps.balances.models import Balance
@@ -180,3 +180,41 @@ class UpdateUserProfileView(APIView):
             },
             "monthly_income": float(monthly_income_value) if monthly_income_value else None
         }, status=status.HTTP_200_OK)
+
+
+class UserPreferenceUpsertView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, user_id):
+        """Obtiene la preferencia de color por user_id"""
+        try:
+            user_pref = UserPreference.objects.get(user_id=user_id)
+        except UserPreference.DoesNotExist:
+            return Response({"error": "Preferencia no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UserPreferenceSerializer(user_pref)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, user_id):
+        """Crea o actualiza la preferencia de color de un usuario"""
+        data = request.data.copy()
+        data['user'] = user_id  # Aseguramos que el serializer tenga el user_id
+
+        try:
+            user_pref = UserPreference.objects.get(user_id=user_id)
+            # Si existe, actualizamos
+            serializer = UserPreferenceSerializer(user_pref, data=data, partial=True)
+            action = "actualizada"
+        except UserPreference.DoesNotExist:
+            # Si no existe, creamos
+            serializer = UserPreferenceSerializer(data=data)
+            action = "creada"
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": f"Preferencia {action} exitosamente", "data": serializer.data},
+                status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
