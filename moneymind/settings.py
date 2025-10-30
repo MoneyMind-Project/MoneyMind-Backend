@@ -29,7 +29,7 @@ ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "moneymind-pe.netlify.app",
-    "https://moneymind-backend-5jv9.onrender.com"
+    "moneymind-backend-5jv9.onrender.com"
 ]
 
 AUTH_USER_MODEL = 'users.User'
