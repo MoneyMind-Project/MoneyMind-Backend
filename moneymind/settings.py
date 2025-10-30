@@ -29,6 +29,7 @@ ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "moneymind-pe.netlify.app",
+    "https://moneymind-backend-5jv9.onrender.com"
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -120,12 +121,27 @@ WSGI_APPLICATION = 'moneymind.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.sqlite3',
+#        'NAME': BASE_DIR / 'db.sqlite3',
+#    }
+#}
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'moneymind_django_render_aev0',  # nombre de la base de datos
+        'USER': 'moneymind_django_render_aev0_user',  # usuario
+        'PASSWORD': 'PYpwBbmzRP3lG4H7hW6irulFKRlgtrU1',  # contraseña
+        'HOST': 'dpg-d41bn024d50c73ekra5g-a.oregon-postgres.render.com',  # host del servidor
+        'PORT': '5432',
+        'OPTIONS': {
+            'sslmode': 'require',  # Render exige conexión SSL
+        }
     }
 }
+
 
 
 # Password validation
